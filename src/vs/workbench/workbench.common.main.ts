@@ -422,6 +422,7 @@ import './contrib/codeActions/browser/codeActions.contribution.js';
 // Timeline
 import './contrib/timeline/browser/timeline.contribution.js';
 import './contrib/timeline/browser/timeline.service.contribution.js';
+import './contrib/livecollab/browser/livecollab.contribution.js';
 
 // Local History
 import './contrib/localHistory/browser/localHistory.contribution.js';

@@ -625,7 +625,8 @@
 		{
 			"name": "vs/workbench/services/request",
 			"project": "vscode-workbench"
-		}
+		},
+		"vs/workbench/contrib/livecollab"
 	],
 	"sessions": [
 		{
