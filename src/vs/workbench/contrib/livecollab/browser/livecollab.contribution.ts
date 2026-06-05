@@ -116,3 +116,54 @@ CommandsRegistry.registerCommand('livecollab.joinSession', async (accessor) => {
 		});
 	}
 });
+
+// Sign In command
+CommandsRegistry.registerCommand('livecollab.signIn', async (accessor) => {
+	const quickInputService = accessor.get(IQuickInputService);
+	const notificationService = accessor.get(INotificationService);
+
+	const picked = await quickInputService.pick(
+		[
+			{ label: '$(mail) Sign in with Email', id: 'email' },
+			{ label: '$(globe) Sign in with Google', id: 'google' },
+			{ label: '$(device-mobile) Sign in with Apple', id: 'apple' },
+		],
+		{ placeHolder: 'Choose how to sign in to LiveCollab' }
+	);
+
+	if (!picked) { return; }
+
+	if (picked.id === 'email') {
+		const email = await quickInputService.input({
+			prompt: 'Email address',
+			placeHolder: 'Enter your LiveCollab email',
+		});
+		if (!email) { return; }
+
+		const password = await quickInputService.input({
+			prompt: 'Password',
+			placeHolder: 'Enter your password',
+			password: true,
+		});
+		if (!password) { return; }
+
+		const result = await livecollabService.login(email.trim(), password);
+		if (result.success) {
+			await livecollabService.connect();
+			notificationService.notify({
+				severity: Severity.Info,
+				message: 'Signed in to LiveCollab successfully!',
+			});
+		} else {
+			notificationService.notify({
+				severity: Severity.Error,
+				message: 'Sign in failed: ' + (result.error || 'Unknown error'),
+			});
+		}
+	} else {
+		notificationService.notify({
+			severity: Severity.Info,
+			message: 'Google and Apple sign in coming soon.',
+		});
+	}
+});
