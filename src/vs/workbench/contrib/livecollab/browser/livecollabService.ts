@@ -5,8 +5,6 @@
 
 import { Emitter, Event } from '../../../../base/common/event.js';
 import { Disposable } from '../../../../base/common/lifecycle.js';
-import { IRequestService, asText } from '../../../../platform/request/common/request.js';
-import { CancellationToken } from '../../../../base/common/cancellation.js';
 
 const SERVER_URL = 'https://live-collab-production.up.railway.app';
 
@@ -26,12 +24,32 @@ export interface ILiveCollabMessage {
 	createdAt: string;
 }
 
+function httpsPost(url: string, body: string, headers: Record<string, string>): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const https = require('https');
+		const urlObj = new URL(url);
+		const options = {
+			hostname: urlObj.hostname,
+			path: urlObj.pathname,
+			method: 'POST',
+			headers: { ...headers, 'Content-Length': Buffer.byteLength(body) },
+		};
+		const req = https.request(options, (res: any) => {
+			let data = '';
+			res.on('data', (chunk: any) => { data += chunk; });
+			res.on('end', () => resolve(data));
+		});
+		req.on('error', reject);
+		req.write(body);
+		req.end();
+	});
+}
+
 export class LiveCollabService extends Disposable {
 
 	private socket: any | undefined;
 	private _token: string | undefined;
 	private _roomId: string | undefined;
-	private _requestService: IRequestService | undefined;
 
 	private readonly _onMembersChanged = this._register(new Emitter<ILiveCollabMember[]>());
 	readonly onMembersChanged: Event<ILiveCollabMember[]> = this._onMembersChanged.event;
@@ -45,48 +63,31 @@ export class LiveCollabService extends Disposable {
 	private readonly _onDisconnected = this._register(new Emitter<void>());
 	readonly onDisconnected: Event<void> = this._onDisconnected.event;
 
-	get isConnected(): boolean {
-		return this.socket?.connected ?? false;
-	}
+	get isConnected(): boolean { return this.socket?.connected ?? false; }
+	get roomId(): string | undefined { return this._roomId; }
+	get token(): string | undefined { return this._token; }
 
-	get roomId(): string | undefined {
-		return this._roomId;
-	}
-
-	setRequestService(requestService: IRequestService): void {
-		this._requestService = requestService;
-	}
+	setRequestService(_: any): void { /* no longer needed */ }
 
 	async login(email: string, password: string): Promise<{ success: boolean; error?: string }> {
-		if (!this._requestService) {
-			return { success: false, error: 'Request service not available' };
-		}
 		try {
-			const context = await this._requestService.request({
-				type: 'POST',
-				url: `${SERVER_URL}/auth/login`,
-				data: JSON.stringify({ email, password }),
-				headers: { 'Content-Type': 'application/json' },
-				callSite: 'LiveCollab.login',
-			}, CancellationToken.None);
-
-			const text = await asText(context);
-			if (!text) { return { success: false, error: 'Empty response from server' }; }
+			const body = JSON.stringify({ email, password });
+			const text = await httpsPost(
+				`${SERVER_URL}/auth/login`,
+				body,
+				{ 'Content-Type': 'application/json' }
+			);
 
 			if (text.trim() === 'invalid_credentials') {
 				return { success: false, error: 'Invalid email or password' };
 			}
 
-			try {
-				const data = JSON.parse(text);
-				if (data.token) {
-					this._token = data.token;
-					return { success: true };
-				}
-				return { success: false, error: data.error || 'Login failed' };
-			} catch {
-				return { success: false, error: text };
+			const data = JSON.parse(text);
+			if (data.token) {
+				this._token = data.token;
+				return { success: true };
 			}
+			return { success: false, error: data.error || 'Login failed' };
 		} catch (e: any) {
 			return { success: false, error: e?.message || 'Could not connect to server' };
 		}
@@ -99,7 +100,6 @@ export class LiveCollabService extends Disposable {
 			auth: { token: this._token },
 			transports: ['websocket'],
 		});
-
 		this.socket.on('connect', () => { this._onConnected.fire(); });
 		this.socket.on('disconnect', () => { this._onDisconnected.fire(); });
 		this.socket.on('room:members', ({ members }: { members: ILiveCollabMember[] }) => {
