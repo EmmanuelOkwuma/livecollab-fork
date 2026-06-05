@@ -17,7 +17,9 @@ import { Codicon } from '../../../../base/common/codicons.js';
 import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
 import { CommandsRegistry } from '../../../../platform/commands/common/commands.js';
 import { IQuickInputService } from '../../../../platform/quickinput/common/quickInput.js';
+import { INotificationService, Severity } from '../../../../platform/notification/common/notification.js';
 import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContainer.js';
+import { livecollabService } from './livecollabService.js';
 
 // Members icon
 const livecollabMembersIcon = registerIcon(
@@ -90,11 +92,27 @@ Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).regi
 // Join Session command
 CommandsRegistry.registerCommand('livecollab.joinSession', async (accessor) => {
 	const quickInputService = accessor.get(IQuickInputService);
+	const notificationService = accessor.get(INotificationService);
+
 	const code = await quickInputService.input({
 		prompt: localize('livecollab.joinSession.prompt', 'Enter invite code'),
 		placeHolder: localize('livecollab.joinSession.placeholder', 'Paste your invite code here...'),
 	});
-	if (code) {
-		console.log('[LiveCollab] Joining session with code:', code);
+
+	if (!code) { return; }
+
+	await livecollabService.connect();
+	const result = await livecollabService.joinRoom(code.trim());
+
+	if (result.success) {
+		notificationService.notify({
+			severity: Severity.Info,
+			message: localize('livecollab.joinSession.success', 'Joined session successfully!'),
+		});
+	} else {
+		notificationService.notify({
+			severity: Severity.Error,
+			message: localize('livecollab.joinSession.error', 'Could not join session: {0}', result.error || 'Unknown error'),
+		});
 	}
 });
