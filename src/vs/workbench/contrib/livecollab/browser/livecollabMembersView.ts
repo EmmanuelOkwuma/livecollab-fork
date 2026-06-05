@@ -1,0 +1,264 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+import { localize } from '../../../../nls.js';
+import { ViewPane, IViewPaneOptions } from '../../../browser/parts/views/viewPane.js';
+import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
+import { IViewDescriptorService } from '../../../common/views.js';
+import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
+import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
+import { IContextMenuService } from '../../../../platform/contextview/browser/contextView.js';
+import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
+import { IOpenerService } from '../../../../platform/opener/common/opener.js';
+import { IThemeService } from '../../../../platform/theme/common/themeService.js';
+import { IHoverService } from '../../../../platform/hover/browser/hover.js';
+
+const USER_COLORS = [
+	'#93c5fd',
+	'#60a5fa',
+	'#38bdf8',
+	'#3b82f6',
+	'#2563eb',
+	'#818cf8',
+];
+
+function colorForIndex(index: number): string {
+	return USER_COLORS[index % USER_COLORS.length];
+}
+
+function initialsFromName(name: string): string {
+	return name.trim().charAt(0).toUpperCase();
+}
+
+interface IMember {
+	userId: string;
+	name: string;
+	role: 'owner' | 'editor' | 'viewer';
+	online: boolean;
+	colorIndex: number;
+}
+
+export class LiveCollabMembersView extends ViewPane {
+
+	static readonly ID = 'workbench.view.livecollab.members';
+	static readonly TITLE = localize('livecollabMembers', "Members");
+
+	private members: IMember[] = [
+		{ userId: '1', name: 'Emmanuel', role: 'owner', online: true, colorIndex: 0 },
+		{ userId: '2', name: 'Lexi', role: 'editor', online: true, colorIndex: 1 },
+	];
+
+	constructor(
+		options: IViewPaneOptions,
+		@IKeybindingService keybindingService: IKeybindingService,
+		@IContextMenuService contextMenuService: IContextMenuService,
+		@IConfigurationService configurationService: IConfigurationService,
+		@IContextKeyService contextKeyService: IContextKeyService,
+		@IViewDescriptorService viewDescriptorService: IViewDescriptorService,
+		@IInstantiationService instantiationService: IInstantiationService,
+		@IOpenerService openerService: IOpenerService,
+		@IThemeService themeService: IThemeService,
+		@IHoverService hoverService: IHoverService,
+	) {
+		super(options, keybindingService, contextMenuService, configurationService, contextKeyService, viewDescriptorService, instantiationService, openerService, themeService, hoverService);
+	}
+
+	protected override renderBody(container: HTMLElement): void {
+		super.renderBody(container);
+
+		container.style.display = 'flex';
+		container.style.flexDirection = 'column';
+		container.style.overflow = 'hidden';
+		container.style.height = '100%';
+
+		// Room ID section
+		const roomIdSection = document.createElement('div');
+		roomIdSection.style.padding = '8px 12px';
+		roomIdSection.style.borderBottom = '1px solid #2b2b2b';
+
+		const roomIdLabel = document.createElement('div');
+		roomIdLabel.style.fontSize = '11px';
+		roomIdLabel.style.color = '#858585';
+		roomIdLabel.style.marginBottom = '6px';
+		roomIdLabel.style.textTransform = 'uppercase';
+		roomIdLabel.style.letterSpacing = '0.08em';
+		roomIdLabel.textContent = 'Room ID';
+		roomIdSection.appendChild(roomIdLabel);
+
+		const roomIdRow = document.createElement('div');
+		roomIdRow.style.display = 'flex';
+		roomIdRow.style.alignItems = 'center';
+		roomIdRow.style.gap = '8px';
+
+		const roomIdText = document.createElement('span');
+		roomIdText.style.fontSize = '11px';
+		roomIdText.style.color = '#cccccc';
+		roomIdText.style.fontFamily = 'monospace';
+		roomIdText.style.flex = '1';
+		roomIdText.style.overflow = 'hidden';
+		roomIdText.style.textOverflow = 'ellipsis';
+		roomIdText.style.whiteSpace = 'nowrap';
+		roomIdText.textContent = '—';
+		roomIdRow.appendChild(roomIdText);
+
+		const copyRoomIdBtn = document.createElement('button');
+		copyRoomIdBtn.style.background = 'transparent';
+		copyRoomIdBtn.style.border = 'none';
+		copyRoomIdBtn.style.color = '#858585';
+		copyRoomIdBtn.style.cursor = 'pointer';
+		copyRoomIdBtn.style.fontSize = '11px';
+		copyRoomIdBtn.style.padding = '4px 8px';
+		copyRoomIdBtn.style.borderRadius = '3px';
+		copyRoomIdBtn.textContent = 'Copy';
+		copyRoomIdBtn.onmouseenter = () => { copyRoomIdBtn.style.color = '#cccccc'; };
+		copyRoomIdBtn.onmouseleave = () => { copyRoomIdBtn.style.color = '#858585'; };
+		roomIdRow.appendChild(copyRoomIdBtn);
+		roomIdSection.appendChild(roomIdRow);
+		container.appendChild(roomIdSection);
+
+		// Invite section
+		const inviteSection = document.createElement('div');
+		inviteSection.style.padding = '8px 12px';
+		inviteSection.style.borderBottom = '1px solid #2b2b2b';
+
+		const inviteLabel = document.createElement('div');
+		inviteLabel.style.fontSize = '11px';
+		inviteLabel.style.color = '#858585';
+		inviteLabel.style.marginBottom = '6px';
+		inviteLabel.style.textTransform = 'uppercase';
+		inviteLabel.style.letterSpacing = '0.08em';
+		inviteLabel.textContent = 'Invite';
+		inviteSection.appendChild(inviteLabel);
+
+		const createInviteBtn = document.createElement('button');
+		createInviteBtn.style.background = '#1e1e1e';
+		createInviteBtn.style.border = '1px solid #2b2b2b';
+		createInviteBtn.style.color = '#cccccc';
+		createInviteBtn.style.borderRadius = '4px';
+		createInviteBtn.style.padding = '4px 8px';
+		createInviteBtn.style.fontSize = '12px';
+		createInviteBtn.style.cursor = 'pointer';
+		createInviteBtn.style.textAlign = 'left';
+		createInviteBtn.style.width = '100%';
+		createInviteBtn.textContent = 'Create invite code';
+		createInviteBtn.onmouseenter = () => { createInviteBtn.style.borderColor = '#007ACC'; };
+		createInviteBtn.onmouseleave = () => { createInviteBtn.style.borderColor = '#2b2b2b'; };
+		inviteSection.appendChild(createInviteBtn);
+		container.appendChild(inviteSection);
+
+		// Members list
+		const membersScroll = document.createElement('div');
+		membersScroll.style.flex = '1';
+		membersScroll.style.overflowY = 'auto';
+		membersScroll.style.padding = '4px 0';
+
+		this.members.forEach((member) => {
+			const row = document.createElement('div');
+			row.style.display = 'flex';
+			row.style.alignItems = 'center';
+			row.style.justifyContent = 'space-between';
+			row.style.padding = '4px 8px';
+			row.style.borderRadius = '4px';
+			row.style.cursor = 'default';
+
+			const left = document.createElement('div');
+			left.style.display = 'flex';
+			left.style.alignItems = 'center';
+			left.style.gap = '8px';
+			left.style.minWidth = '0';
+			left.style.flex = '1';
+
+			const color = colorForIndex(member.colorIndex);
+			const avatar = document.createElement('div');
+			avatar.style.width = '22px';
+			avatar.style.height = '22px';
+			avatar.style.borderRadius = '50%';
+			avatar.style.background = color + '33';
+			avatar.style.border = '1px solid ' + color + '66';
+			avatar.style.backdropFilter = 'blur(4px)';
+			avatar.style.display = 'flex';
+			avatar.style.alignItems = 'center';
+			avatar.style.justifyContent = 'center';
+			avatar.style.fontSize = '11px';
+			avatar.style.fontWeight = '600';
+			avatar.style.color = color;
+			avatar.style.flexShrink = '0';
+			avatar.textContent = initialsFromName(member.name);
+			left.appendChild(avatar);
+
+			const info = document.createElement('div');
+			info.style.minWidth = '0';
+
+			const nameEl = document.createElement('div');
+			nameEl.style.fontSize = '12px';
+			nameEl.style.color = '#cccccc';
+			nameEl.style.overflow = 'hidden';
+			nameEl.style.textOverflow = 'ellipsis';
+			nameEl.style.whiteSpace = 'nowrap';
+			nameEl.textContent = member.name;
+			info.appendChild(nameEl);
+
+			const roleEl = document.createElement('div');
+			roleEl.style.fontSize = '11px';
+			roleEl.style.color = '#858585';
+			roleEl.textContent = member.role;
+			info.appendChild(roleEl);
+
+			left.appendChild(info);
+			row.appendChild(left);
+
+			if (member.role !== 'owner') {
+				const actions = document.createElement('div');
+				actions.style.display = 'none';
+				actions.style.gap = '4px';
+				actions.style.flexShrink = '0';
+
+				const makeBtn = (label: string) => {
+					const btn = document.createElement('button');
+					btn.textContent = label;
+					btn.style.background = 'transparent';
+					btn.style.border = '1px solid #2b2b2b';
+					btn.style.color = '#858585';
+					btn.style.borderRadius = '3px';
+					btn.style.padding = '2px 6px';
+					btn.style.fontSize = '10px';
+					btn.style.cursor = 'pointer';
+					btn.onmouseenter = () => { btn.style.borderColor = '#007ACC'; btn.style.color = '#cccccc'; };
+					btn.onmouseleave = () => { btn.style.borderColor = '#2b2b2b'; btn.style.color = '#858585'; };
+					return btn;
+				};
+
+				if (member.role === 'viewer') { actions.appendChild(makeBtn('Editor')); }
+				if (member.role === 'editor') { actions.appendChild(makeBtn('Viewer')); }
+				actions.appendChild(makeBtn('Owner'));
+
+				row.onmouseenter = () => { row.style.background = '#2a2d2e'; actions.style.display = 'flex'; };
+				row.onmouseleave = () => { row.style.background = 'transparent'; actions.style.display = 'none'; };
+				row.appendChild(actions);
+			} else {
+				row.onmouseenter = () => { row.style.background = '#2a2d2e'; };
+				row.onmouseleave = () => { row.style.background = 'transparent'; };
+			}
+
+			membersScroll.appendChild(row);
+		});
+
+		if (this.members.length <= 1) {
+			const empty = document.createElement('div');
+			empty.style.padding = '12px 16px';
+			empty.style.color = '#6e6e6e';
+			empty.style.fontSize = '12px';
+			empty.style.textAlign = 'center';
+			empty.textContent = 'Just you in here';
+			membersScroll.appendChild(empty);
+		}
+
+		container.appendChild(membersScroll);
+	}
+
+	protected override layoutBody(height: number, width: number): void {
+		super.layoutBody(height, width);
+	}
+}
