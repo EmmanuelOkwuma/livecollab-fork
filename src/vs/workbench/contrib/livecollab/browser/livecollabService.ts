@@ -5,6 +5,8 @@
 
 import { Emitter, Event } from '../../../../base/common/event.js';
 import { Disposable } from '../../../../base/common/lifecycle.js';
+import { IRequestService, asText } from '../../../../platform/request/common/request.js';
+import { CancellationToken } from '../../../../base/common/cancellation.js';
 
 const SERVER_URL = 'https://live-collab-production.up.railway.app';
 
@@ -29,6 +31,7 @@ export class LiveCollabService extends Disposable {
 	private socket: any | undefined;
 	private _token: string | undefined;
 	private _roomId: string | undefined;
+	private _requestService: IRequestService | undefined;
 
 	private readonly _onMembersChanged = this._register(new Emitter<ILiveCollabMember[]>());
 	readonly onMembersChanged: Event<ILiveCollabMember[]> = this._onMembersChanged.event;
@@ -50,47 +53,58 @@ export class LiveCollabService extends Disposable {
 		return this._roomId;
 	}
 
+	setRequestService(requestService: IRequestService): void {
+		this._requestService = requestService;
+	}
+
 	async login(email: string, password: string): Promise<{ success: boolean; error?: string }> {
+		if (!this._requestService) {
+			return { success: false, error: 'Request service not available' };
+		}
 		try {
-			const res = await fetch(`${SERVER_URL}/auth/login`, {
-				method: 'POST',
+			const context = await this._requestService.request({
+				type: 'POST',
+				url: `${SERVER_URL}/auth/login`,
+				data: JSON.stringify({ email, password }),
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ email, password }),
-			});
-			const data = await res.json();
-			if (data.token) {
-				this._token = data.token;
-				return { success: true };
+				callSite: 'LiveCollab.login',
+			}, CancellationToken.None);
+
+			const text = await asText(context);
+			if (!text) { return { success: false, error: 'Empty response from server' }; }
+
+			if (text.trim() === 'invalid_credentials') {
+				return { success: false, error: 'Invalid email or password' };
 			}
-			return { success: false, error: data.error || 'Login failed' };
-		} catch (e) {
-			return { success: false, error: 'Could not connect to server' };
+
+			try {
+				const data = JSON.parse(text);
+				if (data.token) {
+					this._token = data.token;
+					return { success: true };
+				}
+				return { success: false, error: data.error || 'Login failed' };
+			} catch {
+				return { success: false, error: text };
+			}
+		} catch (e: any) {
+			return { success: false, error: e?.message || 'Could not connect to server' };
 		}
 	}
 
 	async connect(): Promise<void> {
 		if (!this._token) { return; }
-
 		const { io } = await import('socket.io-client');
 		this.socket = io(SERVER_URL, {
 			auth: { token: this._token },
 			transports: ['websocket'],
 		});
 
-		this.socket.on('connect', () => {
-			console.log('[LiveCollab] Connected to server');
-			this._onConnected.fire();
-		});
-
-		this.socket.on('disconnect', () => {
-			console.log('[LiveCollab] Disconnected from server');
-			this._onDisconnected.fire();
-		});
-
+		this.socket.on('connect', () => { this._onConnected.fire(); });
+		this.socket.on('disconnect', () => { this._onDisconnected.fire(); });
 		this.socket.on('room:members', ({ members }: { members: ILiveCollabMember[] }) => {
 			this._onMembersChanged.fire(members);
 		});
-
 		this.socket.on('chat:message', (msg: ILiveCollabMessage) => {
 			this._onMessageReceived.fire(msg);
 		});

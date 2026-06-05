@@ -20,6 +20,25 @@ import { IQuickInputService } from '../../../../platform/quickinput/common/quick
 import { INotificationService, Severity } from '../../../../platform/notification/common/notification.js';
 import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContainer.js';
 import { livecollabService } from './livecollabService.js';
+import { IRequestService } from '../../../../platform/request/common/request.js';
+import { IWorkbenchContribution } from '../../../common/contributions.js';
+import { Disposable } from '../../../../base/common/lifecycle.js';
+
+// Bootstrap contribution — runs at startup to wire IRequestService into livecollabService
+class LiveCollabBootstrap extends Disposable implements IWorkbenchContribution {
+	static readonly ID = 'workbench.contrib.livecollabBootstrap';
+	constructor(
+		@IRequestService requestService: IRequestService,
+	) {
+		super();
+		livecollabService.setRequestService(requestService);
+	}
+}
+
+Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).registerWorkbenchContribution(
+	LiveCollabBootstrap,
+	LifecyclePhase.Restored
+);
 
 // Members icon
 const livecollabMembersIcon = registerIcon(
@@ -116,8 +135,6 @@ CommandsRegistry.registerCommand('livecollab.joinSession', async (accessor) => {
 		});
 	}
 });
-
-// Sign In command
 
 // Sign In command
 CommandsRegistry.registerCommand('livecollab.signIn', async (accessor) => {
