@@ -7,22 +7,26 @@ import { localize } from '../../../../nls.js';
 import { Registry } from '../../../../platform/registry/common/platform.js';
 import { IWorkbenchContributionsRegistry, Extensions as WorkbenchExtensions } from '../../../common/contributions.js';
 import { LifecyclePhase } from '../../../services/lifecycle/common/lifecycle.js';
-import { IViewsRegistry, Extensions as ViewExtensions, IViewDescriptor } from '../../../common/views.js';
+import { IViewsRegistry, Extensions as ViewExtensions, IViewDescriptor, ViewContainerLocation, IViewContainersRegistry, Extensions as ViewContainerExtensions } from '../../../common/views.js';
 import { SyncDescriptor } from '../../../../platform/instantiation/common/descriptors.js';
 import { LiveCollabMembersView } from './livecollabMembersView.js';
+import { LiveCollabChatPanel } from './livecollabChatPanel.js';
 import { LiveCollabStatusBarContribution } from './livecollabStatusBar.js';
 import { VIEW_CONTAINER } from '../../files/browser/explorerViewlet.js';
 import { Codicon } from '../../../../base/common/codicons.js';
 import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
 import { CommandsRegistry } from '../../../../platform/commands/common/commands.js';
 import { IQuickInputService } from '../../../../platform/quickinput/common/quickInput.js';
+import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContainer.js';
 
+// Members icon
 const livecollabMembersIcon = registerIcon(
 	'livecollab-members',
 	Codicon.person,
 	localize('livecollabMembersIcon', 'LiveCollab members icon')
 );
 
+// Members panel in Explorer sidebar
 const membersViewDescriptor: IViewDescriptor = {
 	id: LiveCollabMembersView.ID,
 	name: { value: LiveCollabMembersView.TITLE, original: 'Members' },
@@ -40,11 +44,50 @@ Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews(
 	VIEW_CONTAINER
 );
 
+// Chat panel in bottom panel area
+const livecollabChatIcon = registerIcon(
+	'livecollab-chat',
+	Codicon.comment,
+	localize('livecollabChatIcon', 'LiveCollab chat icon')
+);
+
+const CHAT_PANEL_CONTAINER = Registry.as<IViewContainersRegistry>(ViewContainerExtensions.ViewContainersRegistry).registerViewContainer(
+	{
+		id: 'workbench.panel.livecollab.chatContainer',
+		title: { value: localize('livecollabChatPanel', 'Chat'), original: 'Chat' },
+		icon: livecollabChatIcon,
+		order: 100,
+		ctorDescriptor: new SyncDescriptor(ViewPaneContainer, ['workbench.panel.livecollab.chatContainer', { mergeViewWithContainerWhenSingleView: true }]),
+		storageId: 'workbench.panel.livecollab.chatContainer.state',
+		hideIfEmpty: false,
+	},
+	ViewContainerLocation.Panel,
+	{ doNotRegisterOpenCommand: false, isDefault: false }
+);
+
+const chatViewDescriptor: IViewDescriptor = {
+	id: LiveCollabChatPanel.ID,
+	name: { value: LiveCollabChatPanel.TITLE, original: 'Chat' },
+	containerIcon: livecollabChatIcon,
+	ctorDescriptor: new SyncDescriptor(LiveCollabChatPanel),
+	order: 1,
+	weight: 100,
+	canToggleVisibility: false,
+	canMoveView: true,
+};
+
+Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews(
+	[chatViewDescriptor],
+	CHAT_PANEL_CONTAINER
+);
+
+// Status bar
 Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).registerWorkbenchContribution(
 	LiveCollabStatusBarContribution,
 	LifecyclePhase.Restored
 );
 
+// Join Session command
 CommandsRegistry.registerCommand('livecollab.joinSession', async (accessor) => {
 	const quickInputService = accessor.get(IQuickInputService);
 	const code = await quickInputService.input({
@@ -52,7 +95,6 @@ CommandsRegistry.registerCommand('livecollab.joinSession', async (accessor) => {
 		placeHolder: localize('livecollab.joinSession.placeholder', 'Paste your invite code here...'),
 	});
 	if (code) {
-		// TODO: connect to backend with invite code
 		console.log('[LiveCollab] Joining session with code:', code);
 	}
 });
