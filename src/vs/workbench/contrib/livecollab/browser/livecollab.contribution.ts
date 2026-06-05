@@ -10,9 +10,12 @@ import { LifecyclePhase } from '../../../services/lifecycle/common/lifecycle.js'
 import { IViewsRegistry, Extensions as ViewExtensions, IViewDescriptor } from '../../../common/views.js';
 import { SyncDescriptor } from '../../../../platform/instantiation/common/descriptors.js';
 import { LiveCollabMembersView } from './livecollabMembersView.js';
+import { LiveCollabStatusBarContribution } from './livecollabStatusBar.js';
 import { VIEW_CONTAINER } from '../../files/browser/explorerViewlet.js';
 import { Codicon } from '../../../../base/common/codicons.js';
 import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
+import { CommandsRegistry } from '../../../../platform/commands/common/commands.js';
+import { IQuickInputService } from '../../../../platform/quickinput/common/quickInput.js';
 
 const livecollabMembersIcon = registerIcon(
 	'livecollab-members',
@@ -37,13 +40,19 @@ Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews(
 	VIEW_CONTAINER
 );
 
-class LiveCollabContribution {
-	constructor() {
-		console.log('[LiveCollab] Collaboration layer initialized');
-	}
-}
-
 Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).registerWorkbenchContribution(
-	LiveCollabContribution,
+	LiveCollabStatusBarContribution,
 	LifecyclePhase.Restored
 );
+
+CommandsRegistry.registerCommand('livecollab.joinSession', async (accessor) => {
+	const quickInputService = accessor.get(IQuickInputService);
+	const code = await quickInputService.input({
+		prompt: localize('livecollab.joinSession.prompt', 'Enter invite code'),
+		placeHolder: localize('livecollab.joinSession.placeholder', 'Paste your invite code here...'),
+	});
+	if (code) {
+		// TODO: connect to backend with invite code
+		console.log('[LiveCollab] Joining session with code:', code);
+	}
+});
