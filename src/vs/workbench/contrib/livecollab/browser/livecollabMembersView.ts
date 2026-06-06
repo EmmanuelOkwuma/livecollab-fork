@@ -160,7 +160,7 @@ export class LiveCollabMembersView extends ViewPane {
 
 	private updateMembersList(): void {
 		if (!this.membersContainer) { return; }
-		this.membersContainer.innerHTML = '';
+		while (this.membersContainer.firstChild) { this.membersContainer.removeChild(this.membersContainer.firstChild); }
 
 		if (this.members.length === 0) {
 			const empty = document.createElement('div');
