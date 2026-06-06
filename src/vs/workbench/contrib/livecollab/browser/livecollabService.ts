@@ -8,7 +8,7 @@ import { Disposable } from '../../../../base/common/lifecycle.js';
 import { IRequestService, asText } from '../../../../platform/request/common/request.js';
 import { CancellationToken } from '../../../../base/common/cancellation.js';
 
-const SERVER_URL = 'https://live-collab-production.up.railway.app';
+const SERVER_URL = 'http://localhost:4000';
 
 export interface ILiveCollabMember {
 	userId: string;
