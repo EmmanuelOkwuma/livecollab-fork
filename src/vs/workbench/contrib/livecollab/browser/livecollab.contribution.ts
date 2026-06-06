@@ -32,6 +32,7 @@ class LiveCollabBootstrap extends Disposable implements IWorkbenchContribution {
 	) {
 		super();
 		livecollabService.setRequestService(requestService);
+			livecollabService.connect().catch(console.error);
 	}
 }
 
