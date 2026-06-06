@@ -14,14 +14,10 @@ import { IKeybindingService } from '../../../../platform/keybinding/common/keybi
 import { IOpenerService } from '../../../../platform/opener/common/opener.js';
 import { IThemeService } from '../../../../platform/theme/common/themeService.js';
 import { IHoverService } from '../../../../platform/hover/browser/hover.js';
+import { livecollabService, ILiveCollabMember } from './livecollabService.js';
 
 const USER_COLORS = [
-	'#93c5fd',
-	'#60a5fa',
-	'#38bdf8',
-	'#3b82f6',
-	'#2563eb',
-	'#818cf8',
+	'#93c5fd', '#60a5fa', '#38bdf8', '#3b82f6', '#2563eb', '#818cf8',
 ];
 
 function colorForIndex(index: number): string {
@@ -32,23 +28,14 @@ function initialsFromName(name: string): string {
 	return name.trim().charAt(0).toUpperCase();
 }
 
-interface IMember {
-	userId: string;
-	name: string;
-	role: 'owner' | 'editor' | 'viewer';
-	online: boolean;
-	colorIndex: number;
-}
-
 export class LiveCollabMembersView extends ViewPane {
 
 	static readonly ID = 'workbench.view.livecollab.members';
 	static readonly TITLE = localize('livecollabMembers', "Members");
 
-	private members: IMember[] = [
-		{ userId: '1', name: 'Emmanuel', role: 'owner', online: true, colorIndex: 0 },
-		{ userId: '2', name: 'Lexi', role: 'editor', online: true, colorIndex: 1 },
-	];
+	private membersContainer: HTMLElement | undefined;
+	private roomIdText: HTMLElement | undefined;
+	private members: ILiveCollabMember[] = [];
 
 	constructor(
 		options: IViewPaneOptions,
@@ -63,6 +50,14 @@ export class LiveCollabMembersView extends ViewPane {
 		@IHoverService hoverService: IHoverService,
 	) {
 		super(options, keybindingService, contextMenuService, configurationService, contextKeyService, viewDescriptorService, instantiationService, openerService, themeService, hoverService);
+
+		this._register(livecollabService.onMembersChanged((members) => {
+			this.members = members;
+			this.updateMembersList();
+			if (this.roomIdText && livecollabService.roomId) {
+				this.roomIdText.textContent = livecollabService.roomId.slice(0, 8);
+			}
+		}));
 	}
 
 	protected override renderBody(container: HTMLElement): void {
@@ -92,16 +87,16 @@ export class LiveCollabMembersView extends ViewPane {
 		roomIdRow.style.alignItems = 'center';
 		roomIdRow.style.gap = '8px';
 
-		const roomIdText = document.createElement('span');
-		roomIdText.style.fontSize = '11px';
-		roomIdText.style.color = '#cccccc';
-		roomIdText.style.fontFamily = 'monospace';
-		roomIdText.style.flex = '1';
-		roomIdText.style.overflow = 'hidden';
-		roomIdText.style.textOverflow = 'ellipsis';
-		roomIdText.style.whiteSpace = 'nowrap';
-		roomIdText.textContent = '—';
-		roomIdRow.appendChild(roomIdText);
+		this.roomIdText = document.createElement('span');
+		this.roomIdText.style.fontSize = '11px';
+		this.roomIdText.style.color = '#cccccc';
+		this.roomIdText.style.fontFamily = 'monospace';
+		this.roomIdText.style.flex = '1';
+		this.roomIdText.style.overflow = 'hidden';
+		this.roomIdText.style.textOverflow = 'ellipsis';
+		this.roomIdText.style.whiteSpace = 'nowrap';
+		this.roomIdText.textContent = livecollabService.roomId ? livecollabService.roomId.slice(0, 8) : '—';
+		roomIdRow.appendChild(this.roomIdText);
 
 		const copyRoomIdBtn = document.createElement('button');
 		copyRoomIdBtn.style.background = 'transparent';
@@ -114,6 +109,11 @@ export class LiveCollabMembersView extends ViewPane {
 		copyRoomIdBtn.textContent = 'Copy';
 		copyRoomIdBtn.onmouseenter = () => { copyRoomIdBtn.style.color = '#cccccc'; };
 		copyRoomIdBtn.onmouseleave = () => { copyRoomIdBtn.style.color = '#858585'; };
+		copyRoomIdBtn.onclick = () => {
+			if (livecollabService.roomId) {
+				navigator.clipboard.writeText(livecollabService.roomId);
+			}
+		};
 		roomIdRow.appendChild(copyRoomIdBtn);
 		roomIdSection.appendChild(roomIdRow);
 		container.appendChild(roomIdSection);
@@ -149,12 +149,31 @@ export class LiveCollabMembersView extends ViewPane {
 		container.appendChild(inviteSection);
 
 		// Members list
-		const membersScroll = document.createElement('div');
-		membersScroll.style.flex = '1';
-		membersScroll.style.overflowY = 'auto';
-		membersScroll.style.padding = '4px 0';
+		this.membersContainer = document.createElement('div');
+		this.membersContainer.style.flex = '1';
+		this.membersContainer.style.overflowY = 'auto';
+		this.membersContainer.style.padding = '4px 0';
+		container.appendChild(this.membersContainer);
 
-		this.members.forEach((member) => {
+		this.updateMembersList();
+	}
+
+	private updateMembersList(): void {
+		if (!this.membersContainer) { return; }
+		this.membersContainer.innerHTML = '';
+
+		if (this.members.length === 0) {
+			const empty = document.createElement('div');
+			empty.style.padding = '12px 16px';
+			empty.style.color = '#6e6e6e';
+			empty.style.fontSize = '12px';
+			empty.style.textAlign = 'center';
+			empty.textContent = 'No active session';
+			this.membersContainer.appendChild(empty);
+			return;
+		}
+
+		this.members.forEach((member, index) => {
 			const row = document.createElement('div');
 			row.style.display = 'flex';
 			row.style.alignItems = 'center';
@@ -170,7 +189,7 @@ export class LiveCollabMembersView extends ViewPane {
 			left.style.minWidth = '0';
 			left.style.flex = '1';
 
-			const color = colorForIndex(member.colorIndex);
+			const color = colorForIndex(index);
 			const avatar = document.createElement('div');
 			avatar.style.width = '22px';
 			avatar.style.height = '22px';
@@ -185,7 +204,7 @@ export class LiveCollabMembersView extends ViewPane {
 			avatar.style.fontWeight = '600';
 			avatar.style.color = color;
 			avatar.style.flexShrink = '0';
-			avatar.textContent = initialsFromName(member.name);
+			avatar.textContent = initialsFromName(member.name || member.email || 'U');
 			left.appendChild(avatar);
 
 			const info = document.createElement('div');
@@ -197,7 +216,7 @@ export class LiveCollabMembersView extends ViewPane {
 			nameEl.style.overflow = 'hidden';
 			nameEl.style.textOverflow = 'ellipsis';
 			nameEl.style.whiteSpace = 'nowrap';
-			nameEl.textContent = member.name;
+			nameEl.textContent = member.name || member.email || 'Unknown';
 			info.appendChild(nameEl);
 
 			const roleEl = document.createElement('div');
@@ -242,20 +261,8 @@ export class LiveCollabMembersView extends ViewPane {
 				row.onmouseleave = () => { row.style.background = 'transparent'; };
 			}
 
-			membersScroll.appendChild(row);
+			this.membersContainer!.appendChild(row);
 		});
-
-		if (this.members.length <= 1) {
-			const empty = document.createElement('div');
-			empty.style.padding = '12px 16px';
-			empty.style.color = '#6e6e6e';
-			empty.style.fontSize = '12px';
-			empty.style.textAlign = 'center';
-			empty.textContent = 'Just you in here';
-			membersScroll.appendChild(empty);
-		}
-
-		container.appendChild(membersScroll);
 	}
 
 	protected override layoutBody(height: number, width: number): void {
