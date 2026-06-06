@@ -231,16 +231,6 @@ export const startEntries: GettingStartedStartEntryContent = [
                         command: 'command:livecollab.joinSession',
                 }
         },
-        {
-                id: 'livecollab.signIn',
-                title: localize('livecollab.signIn.title', "Sign in to LiveCollab"),
-                description: localize('livecollab.signIn.description', "Sign in to access your rooms and collaborate with your team"),
-                icon: Codicon.signIn,
-                content: {
-                        type: 'startEntry',
-                        command: 'command:livecollab.signIn',
-                }
-        },
 ];
 
 const Button = (title: string, href: string) => `[${title}](${href})`;
