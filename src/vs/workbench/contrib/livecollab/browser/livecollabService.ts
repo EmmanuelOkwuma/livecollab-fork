@@ -39,6 +39,9 @@ export class LiveCollabService extends Disposable {
 	private readonly _onMessageReceived = this._register(new Emitter<ILiveCollabMessage>());
 	readonly onMessageReceived: Event<ILiveCollabMessage> = this._onMessageReceived.event;
 
+	private readonly _onCodeChange = this._register(new Emitter<{ fileId: string; code: string }>());
+	readonly onCodeChange: Event<{ fileId: string; code: string }> = this._onCodeChange.event;
+
 	private readonly _onConnected = this._register(new Emitter<void>());
 	readonly onConnected: Event<void> = this._onConnected.event;
 
@@ -100,6 +103,7 @@ export class LiveCollabService extends Disposable {
 		this.socket.on('room:members', ({ members }: { members: ILiveCollabMember[] }) => {
 			this._onMembersChanged.fire(members);
 		});
+		this.socket.on('code:change', (payload: { fileId: string; code: string }) => { this._onCodeChange.fire(payload); });
 		this.socket.on('chat:message', (msg: ILiveCollabMessage) => {
 			this._onMessageReceived.fire(msg);
 		});
@@ -117,6 +121,11 @@ export class LiveCollabService extends Disposable {
 				}
 			});
 		});
+	}
+
+	emitCodeChange(roomId: string, fileId: string, code: string): void {
+		if (!this.socket) { return; }
+		this.socket.emit("code:change", { roomId, fileId, code });
 	}
 
 	sendMessage(roomId: string, content: string): void {
