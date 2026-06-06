@@ -29,7 +29,7 @@ export interface ILiveCollabMessage {
 export class LiveCollabService extends Disposable {
 
 	private socket: any | undefined;
-	private _token: string | undefined;
+	private _token: string | undefined = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI4NmJlOGYyYi1kNzg4LTQ5NWQtYjcyMC05MGI4YWQ0YTVjYzciLCJlbWFpbCI6ImVtbWFudWVsb2t3dW1hMTExQGdtYWlsLmNvbSIsImlhdCI6MTc4MDcxMjQ4MiwiZXhwIjoxNzgxMzE3MjgyfQ.umjfZQ4_v9s_jijdVkGSgO9Zb3Y-NRNDyNf6cfz09Ms";
 	private _roomId: string | undefined;
 	private _requestService: IRequestService | undefined;
 
