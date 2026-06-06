@@ -90,7 +90,7 @@ export class LiveCollabService extends Disposable {
 	async connect(): Promise<void> {
 		if (!this._token) { return; }
 		// @ts-ignore
-		const { io } = await import('https://cdn.socket.io/4.7.5/socket.io.esm.min.js');
+		const { io } = await import('./vendor/socket.io.esm.min.js');
 		this.socket = io(SERVER_URL, {
 			auth: { token: this._token },
 			transports: ['websocket'],
