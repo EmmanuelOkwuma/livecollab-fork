@@ -2,11 +2,10 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-
 import { Emitter, Event } from '../../../../base/common/event.js';
 import { Disposable } from '../../../../base/common/lifecycle.js';
-import { IRequestService, asText } from '../../../../platform/request/common/request.js';
-import { CancellationToken } from '../../../../base/common/cancellation.js';
+import { IRequestService } from '../../../../platform/request/common/request.js';
+
 
 const SERVER_URL = 'http://localhost:4000';
 
@@ -28,14 +27,20 @@ export interface ILiveCollabMessage {
 
 export class LiveCollabService extends Disposable {
 
-	private socket: any | undefined;
+	private socket: any = null;
 	private _token: string | undefined;
 	private _roomId: string | undefined;
-	private _displayName: string = "User";
+	private _displayName: string = 'User';
 	private _folderRoomCache: Map<string, string> = new Map();
 	private _lastMembers: ILiveCollabMember[] = [];
 	private _fileCache: Map<string, string> = new Map();
-	private _requestService: IRequestService | undefined;
+	private _connecting = false;
+
+	private readonly _onConnected = this._register(new Emitter<void>());
+	readonly onConnected: Event<void> = this._onConnected.event;
+
+	private readonly _onDisconnected = this._register(new Emitter<void>());
+	readonly onDisconnected: Event<void> = this._onDisconnected.event;
 
 	private readonly _onMembersChanged = this._register(new Emitter<ILiveCollabMember[]>());
 	readonly onMembersChanged: Event<ILiveCollabMember[]> = this._onMembersChanged.event;
@@ -55,155 +60,67 @@ export class LiveCollabService extends Disposable {
 	private readonly _onCursorLeave = this._register(new Emitter<{ socketId: string }>());
 	readonly onCursorLeave: Event<{ socketId: string }> = this._onCursorLeave.event;
 
-	private readonly _onConnected = this._register(new Emitter<void>());
-	readonly onConnected: Event<void> = this._onConnected.event;
-
-	private readonly _onDisconnected = this._register(new Emitter<void>());
-	readonly onDisconnected: Event<void> = this._onDisconnected.event;
-
 	get isConnected(): boolean { return this.socket?.connected ?? false; }
 	get roomId(): string | undefined { return this._roomId; }
 	get token(): string | undefined { return this._token; }
+	get lastMembers(): ILiveCollabMember[] { return this._lastMembers; }
 
 	setToken(token: string): void {
 		this._token = token;
-	}
-
-	hasToken(): boolean {
-		return !!this._token;
-	}
-
-	setRequestService(requestService: IRequestService): void {
-		this._requestService = requestService;
-	}
-
-	async login(email: string, password: string): Promise<{ success: boolean; error?: string }> {
-		if (!this._requestService) {
-			return { success: false, error: 'Service not ready — please try again' };
-		}
 		try {
-			const context = await this._requestService.request({
-				type: 'POST',
-				url: `${SERVER_URL}/auth/login`,
-				data: JSON.stringify({ email, password }),
-				headers: { 'Content-Type': 'application/json' },
-				callSite: 'LiveCollab.login',
-			}, CancellationToken.None);
-
-			const text = await asText(context);
-			if (!text) { return { success: false, error: 'Empty response from server' }; }
-			if (text.trim() === 'invalid_credentials') {
-				return { success: false, error: 'Invalid email or password' };
+			const parts = token.split('.');
+			if (parts.length === 3) {
+				const payload = JSON.parse(atob(parts[1]));
+				this._displayName = payload.email ? payload.email.split('@')[0] : 'User';
 			}
-
-			try {
-				const data = JSON.parse(text);
-				if (data.token) {
-					this._token = data.token;
-					return { success: true };
-				}
-				return { success: false, error: data.error || 'Login failed' };
-			} catch {
-				return { success: false, error: text };
-			}
-		} catch (e: any) {
-			return { success: false, error: e?.message || 'Could not connect to server' };
-		}
+		} catch { }
 	}
+
+	hasToken(): boolean { return !!this._token; }
 
 	async connect(): Promise<void> {
 		if (!this._token) { return; }
 		if (this.socket?.connected) { return; }
-		if (this.socket) { this.socket.disconnect(); this.socket = null as any; }
+		if (this._connecting) { return; }
+		this._connecting = true;
+		if (this.socket) { this.socket.disconnect(); this.socket = null; }
 		// @ts-ignore
 		const { io } = await import('./vendor/socket.io.esm.min.js');
-		this.socket = io(SERVER_URL, {
-			auth: { token: this._token },
-			transports: ['websocket'],
+		this.socket = io(SERVER_URL, { auth: { token: this._token }, transports: ['websocket'] });
+		this.socket.on('connect', () => {
+			this._connecting = false;
+			console.log('[LiveCollab] socket connected, user:', this._displayName);
+			this._onConnected.fire();
 		});
-		// Register all socket listeners
-		this.socket.on('disconnect', () => { this._onDisconnected.fire(); });
+		this.socket.on('disconnect', () => { this._connecting = false; this._onDisconnected.fire(); });
 		this.socket.on('room:members', ({ members }: { members: ILiveCollabMember[] }) => {
-			console.log('[LiveCollab] room:members received:', members);
+			console.log('[LiveCollab] room:members received:', members.length);
 			this._lastMembers = members;
 			this._onMembersChanged.fire(members);
 		});
-		this.socket.on('code:change', (payload: { fileId: string; code: string }) => { this._onCodeChange.fire(payload); });
+		this.socket.on('code:change', (payload: { fileId: string; code: string }) => {
+			this._fileCache.set(payload.fileId, payload.code);
+			this._onCodeChange.fire(payload);
+		});
 		this.socket.on('cursor:update', (payload: any) => { this._onCursorUpdate.fire(payload); });
 		this.socket.on('cursor:leave', (payload: any) => { this._onCursorLeave.fire(payload); });
 		this.socket.on('room:state', (state: any) => {
 			if (state?.files) {
-				for (const f of state.files) {
-					this._fileCache.set(f.id, f.content || '');
-				}
+				for (const f of state.files) { this._fileCache.set(f.id, f.content || ''); }
 				this._onRoomState.fire(state);
 			}
 		});
-		this.socket.on('chat:message', (msg: ILiveCollabMessage) => {
-			this._onMessageReceived.fire(msg);
-		});
-		// Wait for connect event
-		return new Promise<void>((resolveConnect) => {
-			this.socket!.on('connect', () => {
-				try {
-					const parts = this._token ? this._token.split('.') : [];
-					if (parts.length === 3) {
-						const payload = JSON.parse(atob(parts[1]));
-						this._displayName = payload.email ? payload.email.split('@')[0] : 'User';
-					}
-				} catch { }
-				this._onConnected.fire();
-				if (this._roomId) {
-					this.socket!.emit('room:join', { roomId: this._roomId, displayName: this._displayName, colorIndex: 0 });
-				}
-				resolveConnect();
-			});
-			setTimeout(resolveConnect, 5000);
-		});
-	}
-
-	async joinRoom(inviteCode: string): Promise<{ success: boolean; roomId?: string; error?: string }> {
-		return new Promise((resolve) => {
-			if (!this.socket) { resolve({ success: false, error: 'Not connected' }); return; }
-			this.socket.emit('room:invite:accept', { code: inviteCode }, (res: any) => {
-				if (res?.roomId) {
-					this._roomId = res.roomId;
-					resolve({ success: true, roomId: res.roomId });
-				} else {
-					resolve({ success: false, error: res?.error || 'Invalid invite code' });
-				}
-			});
-		});
-	}
-
-	emitCursorUpdate(roomId: string, fileId: string, position: { lineNumber: number; column: number }): void {
-		if (!this.socket) { return; }
-		console.log("[LiveCollab] emitting cursor with name:", this._displayName);
-		this.socket.emit("cursor:update", { roomId, fileId, position, name: this._displayName });
-	}
-
-	getFileContent(fileId: string): string | undefined {
-		return this._fileCache.get(fileId);
-	}
-
-	updateFileCache(fileId: string, code: string): void {
-		this._fileCache.set(fileId, code);
-	}
-
-	get lastMembers(): ILiveCollabMember[] { return this._lastMembers; }
-
-	getRoomIdForFolder(folderPath: string): string | undefined {
-		return this._folderRoomCache.get(folderPath);
+		this.socket.on('chat:message', (msg: ILiveCollabMessage) => { this._onMessageReceived.fire(msg); });
 	}
 
 	async createRoom(folderName: string, folderPath: string): Promise<void> {
-		if (!this.socket) { return; }
+		if (!this.socket?.connected) { return; }
 		return new Promise((resolve) => {
-			this.socket!.emit('room:create', { name: folderName }, (res: any) => {
+			this.socket.emit('room:create', { name: folderName }, (res: any) => {
 				if (res?.roomId) {
 					this._roomId = res.roomId;
 					this._folderRoomCache.set(folderPath, res.roomId);
-					console.log('[LiveCollab] folder registered as room:', res.roomId);
+					console.log('[LiveCollab] room created:', res.roomId);
 				}
 				resolve();
 			});
@@ -211,29 +128,61 @@ export class LiveCollabService extends Disposable {
 	}
 
 	async joinExistingRoom(roomId: string): Promise<void> {
-		if (!this.socket) { return; }
+		if (!this.socket?.connected) { return; }
 		this._roomId = roomId;
 		return new Promise((resolve) => {
-			this.socket!.emit('room:join', { roomId, displayName: this._displayName, colorIndex: 0 }, () => {
-				resolve();
+			this.socket.emit('room:join', { roomId, displayName: this._displayName, colorIndex: 0 }, () => { resolve(); });
+		});
+	}
+
+	getRoomIdForFolder(folderPath: string): string | undefined { return this._folderRoomCache.get(folderPath); }
+	getFileContent(fileId: string): string | undefined { return this._fileCache.get(fileId); }
+	updateFileCache(fileId: string, code: string): void { this._fileCache.set(fileId, code); }
+
+	emitCodeChange(roomId: string, fileId: string, code: string): void {
+		if (!this.socket?.connected) { return; }
+		this.socket.emit('code:change', { roomId, fileId, code });
+	}
+
+	emitCursorUpdate(roomId: string, fileId: string, position: { lineNumber: number; column: number }): void {
+		if (!this.socket?.connected) { return; }
+		this.socket.emit('cursor:update', { roomId, fileId, position, name: this._displayName });
+	}
+
+	sendMessage(roomId: string, content: string): void {
+		if (!this.socket?.connected) { return; }
+		this.socket.emit('chat:send', { roomId, text: content, name: this._displayName });
+	}
+
+	async joinRoom(inviteCode: string): Promise<{ success: boolean; roomId?: string; error?: string }> {
+		return new Promise((resolve) => {
+			if (!this.socket?.connected) { resolve({ success: false, error: 'Not connected' }); return; }
+			this.socket.emit('room:invite:accept', { code: inviteCode }, (res: any) => {
+				if (res?.roomId) { this._roomId = res.roomId; resolve({ success: true, roomId: res.roomId }); }
+				else { resolve({ success: false, error: res?.error || 'Invalid invite code' }); }
 			});
 		});
 	}
 
-	emitCodeChange(roomId: string, fileId: string, code: string): void {
-		if (!this.socket) { return; }
-		this.socket.emit("code:change", { roomId, fileId, code });
+	async login(email: string, password: string): Promise<{ success: boolean; error?: string }> {
+		return new Promise((resolve) => {
+			const xhr = new XMLHttpRequest();
+			xhr.open('POST', `${SERVER_URL}/auth/login`, true);
+			xhr.setRequestHeader('Content-Type', 'application/json');
+			xhr.onload = () => {
+				try {
+					const data = JSON.parse(xhr.responseText);
+					if (data.token) { this.setToken(data.token); resolve({ success: true }); }
+					else { resolve({ success: false, error: data.error || 'Invalid email or password' }); }
+				} catch { resolve({ success: false, error: 'Invalid server response' }); }
+			};
+			xhr.onerror = () => resolve({ success: false, error: 'Could not connect to server' });
+			xhr.send(JSON.stringify({ email, password }));
+		});
 	}
 
-	sendMessage(roomId: string, content: string): void {
-		if (!this.socket) { return; }
-		this.socket.emit('chat:message', { roomId, content });
-	}
-
-	override dispose(): void {
-		this.socket?.disconnect();
-		super.dispose();
-	}
+	setRequestService(_requestService: IRequestService): void { }
+	
 }
 
 export const livecollabService = new LiveCollabService();

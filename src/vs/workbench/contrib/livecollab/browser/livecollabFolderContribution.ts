@@ -19,13 +19,21 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 	) {
 		super();
 
-		// Load token from SecretStorage first then check folder
-		this._initWithToken();
-
-		// Listen for folder changes
-		this._register(this.workspaceContextService.onDidChangeWorkspaceFolders(() => {
-			this._onFolderChanged();
+		// When socket connects — register current folder as room
+		this._register(livecollabService.onConnected(() => {
+			console.log('[LiveCollab] socket connected — checking folder');
+			this._registerFolderAsRoom();
 		}));
+
+		// When folder changes while already connected — register new folder
+		this._register(this.workspaceContextService.onDidChangeWorkspaceFolders(() => {
+			if (livecollabService.isConnected) {
+				this._registerFolderAsRoom();
+			}
+		}));
+
+		// On startup — load token and connect (this triggers onConnected above)
+		this._initWithToken();
 	}
 
 	private async _initWithToken(): Promise<void> {
@@ -34,50 +42,27 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 		if (token) {
 			livecollabService.setToken(token);
 			await livecollabService.connect();
-			// Wait for socket to fully authenticate before checking folder
-			await new Promise<void>(resolve => {
-				if (livecollabService.isConnected) { resolve(); return; }
-				const d = livecollabService.onConnected(() => { d.dispose(); resolve(); });
-				setTimeout(resolve, 4000);
-			});
-			console.log('[LiveCollab] after connect wait, isConnected:', livecollabService.isConnected);
 		}
-		this._onFolderChanged();
 	}
 
-	private async _onFolderChanged(): Promise<void> {
-		console.log("[LiveCollab] folder changed, hasToken:", livecollabService.hasToken(), "isConnected:", livecollabService.isConnected);
+	private async _registerFolderAsRoom(): Promise<void> {
 		const folders = this.workspaceContextService.getWorkspace().folders;
 		if (!folders || folders.length === 0) {
 			return;
-		}
-
-		if (!livecollabService.hasToken()) {
-			return;
-		}
-
-		if (!livecollabService.isConnected) {
-			await livecollabService.connect();
-			// Wait for socket to fully connect
-			await new Promise<void>(resolve => {
-				if (livecollabService.isConnected) { resolve(); return; }
-				const d = livecollabService.onConnected(() => { d.dispose(); resolve(); });
-				setTimeout(resolve, 3000); // fallback
-			});
 		}
 
 		const folder = folders[0];
 		const folderPath = folder.uri.fsPath;
 		const folderName = folder.name;
 
-		// Check if we already have a roomId for this folder
 		const existingRoomId = livecollabService.getRoomIdForFolder(folderPath);
 		if (existingRoomId) {
+			console.log('[LiveCollab] folder already registered as room:', existingRoomId);
 			await livecollabService.joinExistingRoom(existingRoomId);
 			return;
 		}
 
-		// Create a new room for this folder
+		console.log('[LiveCollab] registering folder as room:', folderName);
 		await livecollabService.createRoom(folderName, folderPath);
 	}
 }
