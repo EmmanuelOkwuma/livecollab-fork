@@ -112,7 +112,7 @@ export class LiveCollabCursorContribution extends Disposable implements IEditorC
 		const className = `lc-remote-cursor-${socketId.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
 		// Inject per-cursor style
-		this._injectCursorStyle(socketId, color, className);
+		this._injectCursorStyle(socketId, color, className, info.name || "User");
 
 		const range = new Range(lineNumber, column, lineNumber, column);
 		const prev = this._decorations.get(socketId) || [];
@@ -170,7 +170,7 @@ export class LiveCollabCursorContribution extends Disposable implements IEditorC
 
 		const dom = document.createElement('div');
 		dom.style.position = 'absolute';
-		dom.style.transform = 'translateY(-100%)';
+		dom.style.transform = 'translateY(-85%)';
 		dom.style.fontSize = '10px';
 		dom.style.padding = '1px 4px';
 		dom.style.borderRadius = '2px 2px 2px 0';
@@ -181,6 +181,8 @@ export class LiveCollabCursorContribution extends Disposable implements IEditorC
 		dom.style.background = color;
 		dom.style.fontWeight = '600';
 		dom.style.letterSpacing = '0.02em';
+		dom.style.transition = 'opacity 0.3s ease';
+		dom.style.opacity = '1';
 		dom.textContent = name;
 
 		let pos: { lineNumber: number; column: number } | null = position;
@@ -203,6 +205,7 @@ export class LiveCollabCursorContribution extends Disposable implements IEditorC
 
 		this._labelWidgets.set(socketId, { widget, dom });
 		this.editor.addContentWidget(widget);
+		(widget as any).__fadeTimer = setTimeout(() => { dom.style.opacity = '0'; }, 2000);
 	}
 
 	private _removeLabelWidget(socketId: string): void {
@@ -216,7 +219,7 @@ export class LiveCollabCursorContribution extends Disposable implements IEditorC
 		this._styleEl = document.createElement('style');
 		this._styleEl.textContent = `
 			.lc-remote-cursor-base {
-				border-left: 2px solid;
+				border-left: 1px solid;
 				margin-left: -1px;
 				height: 1.2em;
 				display: inline-block;
@@ -236,14 +239,15 @@ export class LiveCollabCursorContribution extends Disposable implements IEditorC
 		document.head.appendChild(this._styleEl);
 	}
 
-	private _injectCursorStyle(socketId: string, color: string, className: string): void {
+	private _injectCursorStyle(socketId: string, color: string, className: string, name: string): void {
 		const styleId = `lc-cursor-style-${socketId.replace(/[^a-zA-Z0-9]/g, '_')}`;
-		if (document.getElementById(styleId)) { return; }
+		const existing = document.getElementById(styleId);
+		if (existing) { existing.remove(); }
 		const style = document.createElement('style');
 		style.id = styleId;
 		style.textContent = `
 			.${className} {
-				border-left: 2px solid ${color};
+				border-left: 1px solid ${color};
 				margin-left: -1px;
 				height: 1.2em;
 				display: inline-block;
@@ -258,6 +262,27 @@ export class LiveCollabCursorContribution extends Disposable implements IEditorC
 				height: 3px;
 				background: ${color};
 				border-radius: 1px 1px 0 0;
+			}
+			.${className}::after {
+				content: '${name}';
+				position: absolute;
+				top: -20px;
+				left: -1px;
+				font-size: 12px;
+				font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+				font-weight: 600;
+				padding: 2px 6px;
+				border-radius: 3px 3px 3px 0;
+				background: ${color};
+				color: white;
+				white-space: nowrap;
+				pointer-events: none;
+				opacity: 0;
+				transition: opacity 0.15s ease;
+				z-index: 999;
+			}
+			.${className}:hover::after {
+				opacity: 1;
 			}
 		`;
 		document.head.appendChild(style);

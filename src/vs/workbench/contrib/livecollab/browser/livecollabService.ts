@@ -158,6 +158,7 @@ export class LiveCollabService extends Disposable {
 
 	emitCursorUpdate(roomId: string, fileId: string, position: { lineNumber: number; column: number }): void {
 		if (!this.socket) { return; }
+		console.log("[LiveCollab] emitting cursor with name:", this._displayName);
 		this.socket.emit("cursor:update", { roomId, fileId, position, name: this._displayName });
 	}
 
