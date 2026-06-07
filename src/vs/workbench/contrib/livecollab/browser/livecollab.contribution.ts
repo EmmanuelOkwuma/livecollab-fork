@@ -23,6 +23,7 @@ import { livecollabService } from './livecollabService.js';
 import { LiveCollabSignInInput } from './livecollabSignInInput.js';
 import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
 import './livecollabEditorContribution.js';
+import { LiveCollabFolderContribution } from './livecollabFolderContribution.js';
 import './livecollabCursorContribution.js';
 import { IRequestService } from '../../../../platform/request/common/request.js';
 import { IWorkbenchContribution } from '../../../common/contributions.js';
@@ -199,5 +200,10 @@ class LiveCollabSignInEditorResolver extends Disposable implements IWorkbenchCon
 
 Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).registerWorkbenchContribution(
 	LiveCollabSignInEditorResolver,
+	LifecyclePhase.Restored
+);
+
+Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).registerWorkbenchContribution(
+	LiveCollabFolderContribution,
 	LifecyclePhase.Restored
 );

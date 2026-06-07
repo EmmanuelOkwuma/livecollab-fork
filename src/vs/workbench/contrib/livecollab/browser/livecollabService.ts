@@ -32,6 +32,7 @@ export class LiveCollabService extends Disposable {
 	private _token: string | undefined;
 	private _roomId: string | undefined;
 	private _displayName: string = "User";
+	private _folderRoomCache: Map<string, string> = new Map();
 	private _fileCache: Map<string, string> = new Map();
 	private _requestService: IRequestService | undefined;
 
@@ -176,6 +177,34 @@ export class LiveCollabService extends Disposable {
 
 	updateFileCache(fileId: string, code: string): void {
 		this._fileCache.set(fileId, code);
+	}
+
+	getRoomIdForFolder(folderPath: string): string | undefined {
+		return this._folderRoomCache.get(folderPath);
+	}
+
+	async createRoom(folderName: string, folderPath: string): Promise<void> {
+		if (!this.socket) { return; }
+		return new Promise((resolve) => {
+			this.socket!.emit('room:create', { name: folderName }, (res: any) => {
+				if (res?.roomId) {
+					this._roomId = res.roomId;
+					this._folderRoomCache.set(folderPath, res.roomId);
+					console.log('[LiveCollab] folder registered as room:', res.roomId);
+				}
+				resolve();
+			});
+		});
+	}
+
+	async joinExistingRoom(roomId: string): Promise<void> {
+		if (!this.socket) { return; }
+		this._roomId = roomId;
+		return new Promise((resolve) => {
+			this.socket!.emit('room:join', { roomId, displayName: this._displayName, colorIndex: 0 }, () => {
+				resolve();
+			});
+		});
 	}
 
 	emitCodeChange(roomId: string, fileId: string, code: string): void {
