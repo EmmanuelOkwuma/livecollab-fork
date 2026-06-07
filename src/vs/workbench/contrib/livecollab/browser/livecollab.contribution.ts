@@ -21,6 +21,7 @@ import { INotificationService, Severity } from '../../../../platform/notificatio
 import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContainer.js';
 import { livecollabService } from './livecollabService.js';
 import './livecollabEditorContribution.js';
+import './livecollabCursorContribution.js';
 import { IRequestService } from '../../../../platform/request/common/request.js';
 import { IWorkbenchContribution } from '../../../common/contributions.js';
 import { Disposable } from '../../../../base/common/lifecycle.js';
