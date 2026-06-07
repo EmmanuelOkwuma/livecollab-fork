@@ -151,9 +151,16 @@ CommandsRegistry.registerCommand('livecollab.signIn', async (accessor) => {
 
 // Sign In Editor Registration
 import { IEditorResolverService, RegisteredEditorPriority } from '../../../services/editor/common/editorResolverService.js';
+import { EditorPaneDescriptor, IEditorPaneRegistry } from '../../../browser/editor.js';
+import { EditorExtensions } from '../../../common/editor.js';
 import { LiveCollabSignInEditor } from './livecollabSignInEditor.js';
 import { ISecretStorageService } from '../../../../platform/secrets/common/secrets.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
+
+Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane(
+	EditorPaneDescriptor.create(LiveCollabSignInEditor, LiveCollabSignInEditor.ID, 'Sign in to LiveCollab'),
+	[new SyncDescriptor(LiveCollabSignInInput)]
+);
 
 class LiveCollabSignInEditorResolver extends Disposable implements IWorkbenchContribution {
 	static readonly ID = 'workbench.contrib.livecollabSignInEditorResolver';
