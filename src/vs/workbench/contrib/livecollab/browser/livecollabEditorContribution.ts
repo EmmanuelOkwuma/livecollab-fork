@@ -22,6 +22,7 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 
 		// Emit code changes to socket when user types
 		this._register(this.editor.onDidChangeModelContent(() => {
+			console.log("[LiveCollab] change fired, connected:", livecollabService.isConnected, "roomId:", livecollabService.roomId);
 			if (this._isApplyingRemoteChange) { return; }
 			if (!livecollabService.isConnected) { return; }
 			if (!livecollabService.roomId) { return; }
