@@ -57,17 +57,18 @@ export class LiveCollabSignInEditor extends EditorPane {
 			padding: 60px 80px;
 			display: flex;
 			flex-direction: column;
-			justify-content: center;
+			justify-content: flex-start;
 			max-width: 500px;
+			padding-top: 160px;
 		`;
 
 		// LiveCollab heading
 		const heading = append(left, $('div'));
 		heading.style.cssText = `
-			font-size: 30px;
+			font-size: 42px;
 			font-weight: 300;
 			color: var(--vscode-foreground);
-			margin-bottom: 4px;
+			margin-bottom: 10px;
 			letter-spacing: -0.5px;
 		`;
 		heading.textContent = 'LiveCollab';
@@ -203,7 +204,7 @@ export class LiveCollabSignInEditor extends EditorPane {
 			align-items: center;
 			justify-content: center;
 			background: var(--vscode-sideBar-background);
-			border-left: 1px solid var(--vscode-widget-border, #2b2b2b);
+			
 		`;
 
 		const logoPlaceholder = append(right, $('div'));
