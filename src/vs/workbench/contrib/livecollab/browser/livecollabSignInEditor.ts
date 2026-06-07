@@ -34,14 +34,14 @@ export class LiveCollabSignInEditor extends EditorPane {
 	}
 
 	protected createEditor(parent: HTMLElement): void {
-		this._container = append(parent, $('div.livecollab-signin-container'));
+		this._container = append(parent, $('div.livecollab-signin-page'));
 		this._container.style.cssText = `
 			display: flex;
-			align-items: center;
-			justify-content: center;
 			height: 100%;
-			background: #1e1e1e;
-			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+			background: var(--vscode-editor-background);
+			font-family: var(--vscode-font-family);
+			color: var(--vscode-foreground);
+			overflow: hidden;
 		`;
 		this._render();
 	}
@@ -50,141 +50,173 @@ export class LiveCollabSignInEditor extends EditorPane {
 		if (!this._container) { return; }
 		clearNode(this._container);
 
-		const card = append(this._container, $('div.livecollab-signin-card'));
-		card.style.cssText = `
-			background: #252526;
-			border: 1px solid #2b2b2b;
-			border-radius: 8px;
-			padding: 40px;
-			width: 100%;
-			max-width: 400px;
+		// Left column — sign in form
+		const left = append(this._container, $('div.livecollab-signin-left'));
+		left.style.cssText = `
+			flex: 1;
+			padding: 60px 80px;
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			max-width: 500px;
 		`;
 
-		// Logo area
-		const logo = append(card, $('div'));
-		logo.style.cssText = 'text-align: center; margin-bottom: 24px;';
-		const logoText = append(logo, $('div'));
-		logoText.style.cssText = 'font-size: 24px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;';
-		logoText.textContent = 'LiveCollab';
-		const subtitle = append(logo, $('div'));
-		subtitle.style.cssText = 'font-size: 13px; color: #858585; margin-top: 4px;';
-		subtitle.textContent = 'Code together, in real time.';
+		// LiveCollab heading
+		const heading = append(left, $('div'));
+		heading.style.cssText = `
+			font-size: 30px;
+			font-weight: 300;
+			color: var(--vscode-foreground);
+			margin-bottom: 4px;
+			letter-spacing: -0.5px;
+		`;
+		heading.textContent = 'LiveCollab';
 
-		// Email field
-		const emailLabel = append(card, $('div'));
-		emailLabel.style.cssText = 'font-size: 11px; color: #858585; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;';
+		const subheading = append(left, $('div'));
+		subheading.style.cssText = `
+			font-size: 13px;
+			color: var(--vscode-descriptionForeground);
+			margin-bottom: 40px;
+		`;
+		subheading.textContent = 'Code together, in real time.';
+
+		// Email label and input
+		const emailLabel = append(left, $('div'));
+		emailLabel.style.cssText = 'font-size: 11px; color: var(--vscode-descriptionForeground); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;';
 		emailLabel.textContent = 'Email';
-		const emailInput = append(card, $('input')) as HTMLInputElement;
+
+		const emailInput = append(left, $('input')) as HTMLInputElement;
 		emailInput.type = 'email';
 		emailInput.placeholder = 'your@email.com';
 		emailInput.style.cssText = `
 			width: 100%;
-			background: #1e1e1e;
-			border: 1px solid #2b2b2b;
-			border-radius: 4px;
-			padding: 8px 12px;
-			color: #cccccc;
+			background: var(--vscode-input-background);
+			border: 1px solid var(--vscode-input-border, #2b2b2b);
+			border-radius: 2px;
+			padding: 7px 10px;
+			color: var(--vscode-input-foreground);
 			font-size: 13px;
 			outline: none;
 			margin-bottom: 16px;
 			box-sizing: border-box;
-			transition: border-color 0.15s;
 		`;
-		emailInput.onfocus = () => { emailInput.style.borderColor = '#007ACC'; };
-		emailInput.onblur = () => { emailInput.style.borderColor = '#2b2b2b'; };
+		emailInput.onfocus = () => { emailInput.style.borderColor = 'var(--vscode-focusBorder)'; };
+		emailInput.onblur = () => { emailInput.style.borderColor = 'var(--vscode-input-border, #2b2b2b)'; };
 
-		// Password field
-		const passwordLabel = append(card, $('div'));
-		passwordLabel.style.cssText = 'font-size: 11px; color: #858585; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;';
+		// Password label and input
+		const passwordLabel = append(left, $('div'));
+		passwordLabel.style.cssText = 'font-size: 11px; color: var(--vscode-descriptionForeground); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;';
 		passwordLabel.textContent = 'Password';
-		const passwordInput = append(card, $('input')) as HTMLInputElement;
+
+		const passwordInput = append(left, $('input')) as HTMLInputElement;
 		passwordInput.type = 'password';
 		passwordInput.placeholder = 'Your password';
 		passwordInput.style.cssText = `
 			width: 100%;
-			background: #1e1e1e;
-			border: 1px solid #2b2b2b;
-			border-radius: 4px;
-			padding: 8px 12px;
-			color: #cccccc;
+			background: var(--vscode-input-background);
+			border: 1px solid var(--vscode-input-border, #2b2b2b);
+			border-radius: 2px;
+			padding: 7px 10px;
+			color: var(--vscode-input-foreground);
 			font-size: 13px;
 			outline: none;
 			margin-bottom: 8px;
 			box-sizing: border-box;
-			transition: border-color 0.15s;
 		`;
-		passwordInput.onfocus = () => { passwordInput.style.borderColor = '#007ACC'; };
-		passwordInput.onblur = () => { passwordInput.style.borderColor = '#2b2b2b'; };
+		passwordInput.onfocus = () => { passwordInput.style.borderColor = 'var(--vscode-focusBorder)'; };
+		passwordInput.onblur = () => { passwordInput.style.borderColor = 'var(--vscode-input-border, #2b2b2b)'; };
 
 		// Error message
-		const errorEl = append(card, $('div'));
-		errorEl.style.cssText = 'color: #F14C4C; font-size: 12px; margin-bottom: 16px; min-height: 18px;';
+		const errorEl = append(left, $('div'));
+		errorEl.style.cssText = 'color: var(--vscode-errorForeground); font-size: 12px; margin-bottom: 16px; min-height: 18px;';
 
 		// Sign In button
-		const signInBtn = append(card, $('button'));
+		const signInBtn = append(left, $('button')) as HTMLButtonElement;
 		signInBtn.style.cssText = `
-			width: 100%;
-			background: #007ACC;
+			background: var(--vscode-button-background);
 			border: none;
-			border-radius: 4px;
-			padding: 10px;
-			color: #ffffff;
+			border-radius: 2px;
+			padding: 8px 16px;
+			color: var(--vscode-button-foreground);
 			font-size: 13px;
-			font-weight: 600;
+			font-weight: 500;
 			cursor: pointer;
-			margin-bottom: 20px;
-			transition: background 0.15s;
+			margin-bottom: 24px;
+			width: 100%;
 		`;
 		signInBtn.textContent = 'Sign In';
-		signInBtn.onmouseenter = () => { signInBtn.style.background = '#005fa3'; };
-		signInBtn.onmouseleave = () => { signInBtn.style.background = '#007ACC'; };
+		signInBtn.onmouseenter = () => { signInBtn.style.background = 'var(--vscode-button-hoverBackground)'; };
+		signInBtn.onmouseleave = () => { signInBtn.style.background = 'var(--vscode-button-background)'; };
 
 		// Divider
-		const divider = append(card, $('div'));
+		const divider = append(left, $('div'));
 		divider.style.cssText = 'display: flex; align-items: center; gap: 12px; margin-bottom: 16px;';
 		const line1 = append(divider, $('div'));
-		line1.style.cssText = 'flex: 1; height: 1px; background: #2b2b2b;';
+		line1.style.cssText = 'flex: 1; height: 1px; background: var(--vscode-widget-border, #2b2b2b);';
 		const orText = append(divider, $('div'));
-		orText.style.cssText = 'font-size: 11px; color: #555;';
+		orText.style.cssText = 'font-size: 11px; color: var(--vscode-descriptionForeground);';
 		orText.textContent = 'or continue with';
 		const line2 = append(divider, $('div'));
-		line2.style.cssText = 'flex: 1; height: 1px; background: #2b2b2b;';
+		line2.style.cssText = 'flex: 1; height: 1px; background: var(--vscode-widget-border, #2b2b2b);';
 
-		// Social buttons row
-		const socialRow = append(card, $('div'));
+		// Social buttons
+		const socialRow = append(left, $('div'));
 		socialRow.style.cssText = 'display: flex; gap: 12px;';
 
-		const googleBtn = append(socialRow, $('button'));
+		const googleBtn = append(socialRow, $('button')) as HTMLButtonElement;
 		googleBtn.style.cssText = `
 			flex: 1;
 			background: transparent;
-			border: 1px solid #2b2b2b;
-			border-radius: 4px;
-			padding: 10px;
-			color: #858585;
+			border: 1px solid var(--vscode-widget-border, #2b2b2b);
+			border-radius: 2px;
+			padding: 8px;
+			color: var(--vscode-descriptionForeground);
 			font-size: 12px;
 			cursor: not-allowed;
 			opacity: 0.5;
 		`;
 		googleBtn.textContent = 'G  Google';
 		googleBtn.title = 'Coming soon';
+		googleBtn.disabled = true;
 
-		const appleBtn = append(socialRow, $('button'));
+		const appleBtn = append(socialRow, $('button')) as HTMLButtonElement;
 		appleBtn.style.cssText = `
 			flex: 1;
 			background: transparent;
-			border: 1px solid #2b2b2b;
-			border-radius: 4px;
-			padding: 10px;
-			color: #858585;
+			border: 1px solid var(--vscode-widget-border, #2b2b2b);
+			border-radius: 2px;
+			padding: 8px;
+			color: var(--vscode-descriptionForeground);
 			font-size: 12px;
 			cursor: not-allowed;
 			opacity: 0.5;
 		`;
 		appleBtn.textContent = '  Apple';
 		appleBtn.title = 'Coming soon';
+		appleBtn.disabled = true;
 
-		// Sign in handler
+		// Right column — logo placeholder
+		const right = append(this._container, $('div.livecollab-signin-right'));
+		right.style.cssText = `
+			flex: 1;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			background: var(--vscode-sideBar-background);
+			border-left: 1px solid var(--vscode-widget-border, #2b2b2b);
+		`;
+
+		const logoPlaceholder = append(right, $('div'));
+		logoPlaceholder.style.cssText = `
+			font-size: 64px;
+			font-weight: 700;
+			color: var(--vscode-widget-border, #2b2b2b);
+			letter-spacing: -2px;
+			user-select: none;
+		`;
+		logoPlaceholder.textContent = 'LC';
+
+		// Sign in logic
 		const doSignIn = async () => {
 			const email = emailInput.value.trim();
 			const password = passwordInput.value;
@@ -193,7 +225,7 @@ export class LiveCollabSignInEditor extends EditorPane {
 				return;
 			}
 			signInBtn.textContent = 'Signing in...';
-			(signInBtn as HTMLButtonElement).disabled = true;
+			signInBtn.disabled = true;
 			errorEl.textContent = '';
 
 			const result = await livecollabService.login(email, password);
@@ -201,15 +233,14 @@ export class LiveCollabSignInEditor extends EditorPane {
 				await this.secretStorageService.set('livecollab.token', livecollabService.token!);
 				await livecollabService.connect();
 				signInBtn.textContent = 'Signed in!';
-				signInBtn.style.background = '#2EA043';
 				setTimeout(async () => {
 					const activeEditor = this.editorService.activeEditor;
-if (activeEditor) { await this.group.closeEditor(activeEditor); }
+					if (activeEditor) { await this.group.closeEditor(activeEditor); }
 				}, 800);
 			} else {
 				errorEl.textContent = result.error || 'Invalid credentials. Please try again.';
 				signInBtn.textContent = 'Sign In';
-				(signInBtn as HTMLButtonElement).disabled = false;
+				signInBtn.disabled = false;
 			}
 		};
 
