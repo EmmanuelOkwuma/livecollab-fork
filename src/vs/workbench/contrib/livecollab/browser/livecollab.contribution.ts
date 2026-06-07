@@ -20,6 +20,8 @@ import { IQuickInputService } from '../../../../platform/quickinput/common/quick
 import { INotificationService, Severity } from '../../../../platform/notification/common/notification.js';
 import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContainer.js';
 import { livecollabService } from './livecollabService.js';
+import { LiveCollabSignInInput } from './livecollabSignInInput.js';
+import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
 import './livecollabEditorContribution.js';
 import './livecollabCursorContribution.js';
 import { IRequestService } from '../../../../platform/request/common/request.js';
@@ -139,10 +141,56 @@ CommandsRegistry.registerCommand('livecollab.joinSession', async (accessor) => {
 	}
 });
 
-// Sign In command
+// Sign In command - opens sign in tab
 CommandsRegistry.registerCommand('livecollab.signIn', async (accessor) => {
-	const quickInputService = accessor.get(IQuickInputService);
-	const notificationService = accessor.get(INotificationService);
-	const { LiveCollabLoginPanel } = await import('./livecollabLoginPanel.js');
-	await LiveCollabLoginPanel.show(quickInputService, notificationService);
+	const editorService = accessor.get(IEditorService);
+	const instantiationService = accessor.get(IInstantiationService);
+	const input = instantiationService.createInstance(LiveCollabSignInInput);
+	await editorService.openEditor(input, { pinned: false });
 });
+
+// Sign In Editor Registration
+import { IEditorResolverService, RegisteredEditorPriority } from '../../../services/editor/common/editorResolverService.js';
+import { LiveCollabSignInEditor } from './livecollabSignInEditor.js';
+import { ISecretStorageService } from '../../../../platform/secrets/common/secrets.js';
+import { IEditorService } from '../../../services/editor/common/editorService.js';
+
+class LiveCollabSignInEditorResolver extends Disposable implements IWorkbenchContribution {
+	static readonly ID = 'workbench.contrib.livecollabSignInEditorResolver';
+	constructor(
+		@IEditorResolverService editorResolverService: IEditorResolverService,
+		@IInstantiationService private readonly instantiationService: IInstantiationService,
+		@ISecretStorageService private readonly secretStorageService: ISecretStorageService,
+
+	) {
+		super();
+		this._register(editorResolverService.registerEditor(
+			`${LiveCollabSignInInput.RESOURCE.scheme}://**`,
+			{
+				id: LiveCollabSignInEditor.ID,
+				label: 'Sign in to LiveCollab',
+				priority: RegisteredEditorPriority.builtin,
+			},
+			{ singlePerResource: true, canSupportResource: uri => uri.scheme === LiveCollabSignInInput.RESOURCE.scheme && uri.authority === 'livecollab_signin_page' },
+			{
+				createEditorInput: () => ({
+					editor: this.instantiationService.createInstance(LiveCollabSignInInput),
+					options: { pinned: false }
+				})
+			}
+		));
+
+		// Check for stored token on startup
+		this.secretStorageService.get('livecollab.token').then(token => {
+			if (token) {
+				livecollabService.setToken(token);
+				livecollabService.connect().catch(console.error);
+			}
+		});
+	}
+}
+
+Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).registerWorkbenchContribution(
+	LiveCollabSignInEditorResolver,
+	LifecyclePhase.Restored
+);

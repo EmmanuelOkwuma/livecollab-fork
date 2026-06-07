@@ -63,6 +63,14 @@ export class LiveCollabService extends Disposable {
 	get roomId(): string | undefined { return this._roomId; }
 	get token(): string | undefined { return this._token; }
 
+	setToken(token: string): void {
+		this._token = token;
+	}
+
+	hasToken(): boolean {
+		return !!this._token;
+	}
+
 	setRequestService(requestService: IRequestService): void {
 		this._requestService = requestService;
 	}
