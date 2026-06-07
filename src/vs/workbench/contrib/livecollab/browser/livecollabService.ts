@@ -7,7 +7,7 @@ import { Disposable } from '../../../../base/common/lifecycle.js';
 import { IRequestService } from '../../../../platform/request/common/request.js';
 
 
-const SERVER_URL = 'http://localhost:4000';
+const SERVER_URL = 'https://live-collab-production.up.railway.app';
 
 export interface ILiveCollabMember {
 	userId: string;
