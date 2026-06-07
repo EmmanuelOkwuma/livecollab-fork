@@ -6,6 +6,7 @@
 import { Disposable } from '../../../../base/common/lifecycle.js';
 import { IWorkbenchContribution } from '../../../common/contributions.js';
 import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
+import { ISecretStorageService } from '../../../../platform/secrets/common/secrets.js';
 import { livecollabService } from './livecollabService.js';
 
 export class LiveCollabFolderContribution extends Disposable implements IWorkbenchContribution {
@@ -14,16 +15,26 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 
 	constructor(
 		@IWorkspaceContextService private readonly workspaceContextService: IWorkspaceContextService,
+		@ISecretStorageService private readonly secretStorageService: ISecretStorageService,
 	) {
 		super();
 
-		// Check if a folder is already open on startup
-		this._onFolderChanged();
+		// Load token from SecretStorage first then check folder
+		this._initWithToken();
 
 		// Listen for folder changes
 		this._register(this.workspaceContextService.onDidChangeWorkspaceFolders(() => {
 			this._onFolderChanged();
 		}));
+	}
+
+	private async _initWithToken(): Promise<void> {
+		const token = await this.secretStorageService.get('livecollab.token');
+		if (token) {
+			livecollabService.setToken(token);
+			await livecollabService.connect();
+		}
+		this._onFolderChanged();
 	}
 
 	private async _onFolderChanged(): Promise<void> {
