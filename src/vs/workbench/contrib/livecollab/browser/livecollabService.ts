@@ -33,6 +33,7 @@ export class LiveCollabService extends Disposable {
 	private _roomId: string | undefined;
 	private _displayName: string = "User";
 	private _folderRoomCache: Map<string, string> = new Map();
+	private _lastMembers: ILiveCollabMember[] = [];
 	private _fileCache: Map<string, string> = new Map();
 	private _requestService: IRequestService | undefined;
 
@@ -112,27 +113,19 @@ export class LiveCollabService extends Disposable {
 
 	async connect(): Promise<void> {
 		if (!this._token) { return; }
+		if (this.socket?.connected) { return; }
+		if (this.socket) { this.socket.disconnect(); this.socket = null as any; }
 		// @ts-ignore
 		const { io } = await import('./vendor/socket.io.esm.min.js');
 		this.socket = io(SERVER_URL, {
 			auth: { token: this._token },
 			transports: ['websocket'],
 		});
-		this.socket.on('connect', () => {
-			try {
-				const parts = this._token ? this._token.split('.') : [];
-				if (parts.length === 3) {
-					const payload = JSON.parse(atob(parts[1]));
-					this._displayName = payload.email ? payload.email.split('@')[0] : 'User';
-				}
-			} catch { }
-			this._onConnected.fire();
-			if (this._roomId) {
-				this.socket.emit('room:join', { roomId: this._roomId, displayName: this._displayName, colorIndex: 0 });
-			}
-		});
+		// Register all socket listeners
 		this.socket.on('disconnect', () => { this._onDisconnected.fire(); });
 		this.socket.on('room:members', ({ members }: { members: ILiveCollabMember[] }) => {
+			console.log('[LiveCollab] room:members received:', members);
+			this._lastMembers = members;
 			this._onMembersChanged.fire(members);
 		});
 		this.socket.on('code:change', (payload: { fileId: string; code: string }) => { this._onCodeChange.fire(payload); });
@@ -148,6 +141,24 @@ export class LiveCollabService extends Disposable {
 		});
 		this.socket.on('chat:message', (msg: ILiveCollabMessage) => {
 			this._onMessageReceived.fire(msg);
+		});
+		// Wait for connect event
+		return new Promise<void>((resolveConnect) => {
+			this.socket!.on('connect', () => {
+				try {
+					const parts = this._token ? this._token.split('.') : [];
+					if (parts.length === 3) {
+						const payload = JSON.parse(atob(parts[1]));
+						this._displayName = payload.email ? payload.email.split('@')[0] : 'User';
+					}
+				} catch { }
+				this._onConnected.fire();
+				if (this._roomId) {
+					this.socket!.emit('room:join', { roomId: this._roomId, displayName: this._displayName, colorIndex: 0 });
+				}
+				resolveConnect();
+			});
+			setTimeout(resolveConnect, 5000);
 		});
 	}
 
@@ -178,6 +189,8 @@ export class LiveCollabService extends Disposable {
 	updateFileCache(fileId: string, code: string): void {
 		this._fileCache.set(fileId, code);
 	}
+
+	get lastMembers(): ILiveCollabMember[] { return this._lastMembers; }
 
 	getRoomIdForFolder(folderPath: string): string | undefined {
 		return this._folderRoomCache.get(folderPath);

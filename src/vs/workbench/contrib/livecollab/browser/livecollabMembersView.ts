@@ -51,9 +51,20 @@ export class LiveCollabMembersView extends ViewPane {
 	) {
 		super(options, keybindingService, contextMenuService, configurationService, contextKeyService, viewDescriptorService, instantiationService, openerService, themeService, hoverService);
 
+		this._register(livecollabService.onConnected(() => {
+			if (livecollabService.lastMembers.length > 0) {
+				this.members = livecollabService.lastMembers;
+				this.updateMembersList();
+			}
+		}));
+
 		this._register(livecollabService.onMembersChanged((members) => {
 			this.members = members;
-			this.updateMembersList();
+			// Load existing members immediately
+		if (livecollabService.lastMembers.length > 0) {
+			this.members = livecollabService.lastMembers;
+		}
+		this.updateMembersList();
 			if (this.roomIdText && livecollabService.roomId) {
 				this.roomIdText.textContent = livecollabService.roomId.slice(0, 8);
 			}

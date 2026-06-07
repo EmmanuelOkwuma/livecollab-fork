@@ -30,14 +30,23 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 
 	private async _initWithToken(): Promise<void> {
 		const token = await this.secretStorageService.get('livecollab.token');
+		console.log('[LiveCollab] _initWithToken token found:', !!token);
 		if (token) {
 			livecollabService.setToken(token);
 			await livecollabService.connect();
+			// Wait for socket to fully authenticate before checking folder
+			await new Promise<void>(resolve => {
+				if (livecollabService.isConnected) { resolve(); return; }
+				const d = livecollabService.onConnected(() => { d.dispose(); resolve(); });
+				setTimeout(resolve, 4000);
+			});
+			console.log('[LiveCollab] after connect wait, isConnected:', livecollabService.isConnected);
 		}
 		this._onFolderChanged();
 	}
 
 	private async _onFolderChanged(): Promise<void> {
+		console.log("[LiveCollab] folder changed, hasToken:", livecollabService.hasToken(), "isConnected:", livecollabService.isConnected);
 		const folders = this.workspaceContextService.getWorkspace().folders;
 		if (!folders || folders.length === 0) {
 			return;
@@ -49,6 +58,12 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 
 		if (!livecollabService.isConnected) {
 			await livecollabService.connect();
+			// Wait for socket to fully connect
+			await new Promise<void>(resolve => {
+				if (livecollabService.isConnected) { resolve(); return; }
+				const d = livecollabService.onConnected(() => { d.dispose(); resolve(); });
+				setTimeout(resolve, 3000); // fallback
+			});
 		}
 
 		const folder = folders[0];
