@@ -30,7 +30,7 @@ export class LiveCollabService extends Disposable {
 
 	private socket: any | undefined;
 	private _token: string | undefined = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI4NmJlOGYyYi1kNzg4LTQ5NWQtYjcyMC05MGI4YWQ0YTVjYzciLCJlbWFpbCI6ImVtbWFudWVsb2t3dW1hMTExQGdtYWlsLmNvbSIsImlhdCI6MTc4MDc0MjQwMSwiZXhwIjoxNzgxMzQ3MjAxfQ.95N9e68D6M2mUAVBZZjyG41-cimaqWvcb95NZz866gc";
-	private _roomId: string | undefined;
+	private _roomId: string | undefined = "room-520";
 	private _requestService: IRequestService | undefined;
 
 	private readonly _onMembersChanged = this._register(new Emitter<ILiveCollabMember[]>());
@@ -98,7 +98,12 @@ export class LiveCollabService extends Disposable {
 			auth: { token: this._token },
 			transports: ['websocket'],
 		});
-		this.socket.on('connect', () => { this._onConnected.fire(); });
+		this.socket.on('connect', () => {
+			this._onConnected.fire();
+			if (this._roomId) {
+				this.socket.emit('room:join', { roomId: this._roomId, displayName: 'User', colorIndex: 0 });
+			}
+		});
 		this.socket.on('disconnect', () => { this._onDisconnected.fire(); });
 		this.socket.on('room:members', ({ members }: { members: ILiveCollabMember[] }) => {
 			this._onMembersChanged.fire(members);
