@@ -31,6 +31,7 @@ export class LiveCollabService extends Disposable {
 	private socket: any | undefined;
 	private _token: string | undefined = localStorage.getItem('lc_test_token') || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI4NmJlOGYyYi1kNzg4LTQ5NWQtYjcyMC05MGI4YWQ0YTVjYzciLCJlbWFpbCI6ImVtbWFudWVsb2t3dW1hMTExQGdtYWlsLmNvbSIsImlhdCI6MTc4MDc5MzY3OSwiZXhwIjoxNzgxMzk4NDc5fQ.HQJxZdLz15B_gADxRlTTkuY3ixYP087-SLcoapC-9Jo";
 	private _roomId: string | undefined = "room-520426e6-5185-410f-9909-fc4d5220912e";
+	private _fileCache: Map<string, string> = new Map();
 	private _requestService: IRequestService | undefined;
 
 	private readonly _onMembersChanged = this._register(new Emitter<ILiveCollabMember[]>());
@@ -41,6 +42,9 @@ export class LiveCollabService extends Disposable {
 
 	private readonly _onCodeChange = this._register(new Emitter<{ fileId: string; code: string }>());
 	readonly onCodeChange: Event<{ fileId: string; code: string }> = this._onCodeChange.event;
+
+	private readonly _onRoomState = this._register(new Emitter<{ files: Array<{ id: string; content: string }> }>());
+	readonly onRoomState: Event<{ files: Array<{ id: string; content: string }> }> = this._onRoomState.event;
 
 	private readonly _onConnected = this._register(new Emitter<void>());
 	readonly onConnected: Event<void> = this._onConnected.event;
@@ -109,6 +113,14 @@ export class LiveCollabService extends Disposable {
 			this._onMembersChanged.fire(members);
 		});
 		this.socket.on('code:change', (payload: { fileId: string; code: string }) => { this._onCodeChange.fire(payload); });
+		this.socket.on('room:state', (state: any) => {
+			if (state?.files) {
+				for (const f of state.files) {
+					this._fileCache.set(f.id, f.content || '');
+				}
+				this._onRoomState.fire(state);
+			}
+		});
 		this.socket.on('chat:message', (msg: ILiveCollabMessage) => {
 			this._onMessageReceived.fire(msg);
 		});
@@ -126,6 +138,14 @@ export class LiveCollabService extends Disposable {
 				}
 			});
 		});
+	}
+
+	getFileContent(fileId: string): string | undefined {
+		return this._fileCache.get(fileId);
+	}
+
+	updateFileCache(fileId: string, code: string): void {
+		this._fileCache.set(fileId, code);
 	}
 
 	emitCodeChange(roomId: string, fileId: string, code: string): void {

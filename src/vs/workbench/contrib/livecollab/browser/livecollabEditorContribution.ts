@@ -34,10 +34,29 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 			const code = model.getValue();
 
 			livecollabService.emitCodeChange(livecollabService.roomId, fileId, code);
+			livecollabService.updateFileCache(fileId, code);
+		}));
+
+		// When switching files, load latest content from cache
+		this._register(this.editor.onDidChangeModel(() => {
+			const model = this.editor.getModel();
+			if (!model) { return; }
+			const fileId = model.uri.toString();
+			const cached = livecollabService.getFileContent(fileId);
+			if (cached !== undefined && cached !== model.getValue()) {
+				this._isApplyingRemoteChange = true;
+				try {
+					model.pushEditOperations([], [{ range: model.getFullModelRange(), text: cached }], () => null);
+				} finally {
+					this._isApplyingRemoteChange = false;
+				}
+			}
 		}));
 
 		// Apply remote code changes to this editor
 		this._register(livecollabService.onCodeChange(({ fileId, code }) => {
+			// Always update cache regardless of which file is open
+			livecollabService.updateFileCache(fileId, code);
 			const model = this.editor.getModel();
 			if (!model) { return; }
 
