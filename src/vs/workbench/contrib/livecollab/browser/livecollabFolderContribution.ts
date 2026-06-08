@@ -9,6 +9,7 @@ import { IWorkspaceContextService } from '../../../../platform/workspace/common/
 import { ISecretStorageService } from '../../../../platform/secrets/common/secrets.js';
 import { livecollabService } from './livecollabService.js';
 import { livecollabFileSystemProvider, LIVECOLLAB_SCHEME } from './livecollabFileSystemProvider.js';
+import { IWorkspaceEditingService } from '../../../services/workspaces/common/workspaceEditing.js';
 import { IFileService } from '../../../../platform/files/common/files.js';
 import { URI } from '../../../../base/common/uri.js';
 
@@ -20,6 +21,7 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 		@IWorkspaceContextService private readonly workspaceContextService: IWorkspaceContextService,
 		@ISecretStorageService private readonly secretStorageService: ISecretStorageService,
 		@IFileService private readonly fileService: IFileService,
+		@IWorkspaceEditingService private readonly workspaceEditingService: IWorkspaceEditingService,
 	) {
 		super();
 
@@ -40,14 +42,9 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 			livecollabFileSystemProvider.setRoomId(roomId);
 			await livecollabFileSystemProvider.populateFromTree(tree);
 			// Open the virtual folder in the explorer
-			const folderUri = { scheme: LIVECOLLAB_SCHEME, authority: roomId, path: '/' };
-			const { URI: UriClass } = await import('../../../../base/common/uri.js');
-			const uri = UriClass.from(folderUri);
-			// Add to workspace
-			const workspaceService = this.workspaceContextService as any;
-			if (workspaceService.addFolders) {
-				await workspaceService.addFolders([{ uri }]);
-			}
+			const uri = URI.file('/').with({ scheme: LIVECOLLAB_SCHEME, authority: roomId, path: '/' });
+			// Add virtual folder to workspace
+			await this.workspaceEditingService.updateFolders(0, 0, [{ uri }]);
 		}));
 
 		// When a new member joins — re-broadcast file tree to room
