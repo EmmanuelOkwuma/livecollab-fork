@@ -67,8 +67,8 @@ export class LiveCollabService extends Disposable {
 	private readonly _onMemberJoined = this._register(new Emitter<void>());
 	readonly onMemberJoined: Event<void> = this._onMemberJoined.event;
 
-	private readonly _onFileTree = this._register(new Emitter<any[]>());
-	readonly onFileTree: Event<any[]> = this._onFileTree.event;
+	private readonly _onFileTree = this._register(new Emitter<{ tree: any[], roomName: string }>());
+	readonly onFileTree: Event<{ tree: any[], roomName: string }> = this._onFileTree.event;
 
 	private readonly _onFileContent = this._register(new Emitter<{ path: string; content: string }>());
 	readonly onFileContent: Event<{ path: string; content: string }> = this._onFileContent.event;
@@ -123,9 +123,10 @@ export class LiveCollabService extends Disposable {
 			this._onMemberJoined.fire();
 		});
 		this.socket.on('room:file:tree', ({ tree, roomName }: { tree: any[], roomName?: string }) => {
-			console.log('[LiveCollab] file tree received:', tree.length, 'items, roomName:', roomName, 'current _roomName:', this._roomName);
+			const resolvedName = roomName || this._roomName || 'Shared Room';
+			console.log('[LiveCollab] file tree received:', tree.length, 'items, roomName:', resolvedName);
 			if (roomName) { this._roomName = roomName; }
-			this._onFileTree.fire(tree);
+			this._onFileTree.fire({ tree, roomName: resolvedName });
 		});
 		this.socket.on('room:file:content', ({ path, content }: { path: string; content: string }) => {
 			console.log('[LiveCollab] file content received:', path);

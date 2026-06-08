@@ -36,19 +36,18 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 
 		let _virtualFolderAdded = false;
 		// When file tree arrives — populate virtual file system and open workspace
-		this._register(livecollabService.onFileTree(async (tree) => {
+		this._register(livecollabService.onFileTree(async ({ tree, roomName }) => {
 			const roomId = livecollabService.roomId;
 			if (!roomId) { return; }
-			console.log('[LiveCollab] populating virtual file system with tree:', tree.length, 'items');
+			console.log('[LiveCollab] populating virtual file system with tree:', tree.length, 'items, roomName:', roomName);
 			livecollabFileSystemProvider.setRoomId(roomId);
 			await livecollabFileSystemProvider.populateFromTree(tree);
 			// Open the virtual folder in the explorer
 			const uri = URI.file('/').with({ scheme: LIVECOLLAB_SCHEME, authority: roomId, path: '/' });
-			const name = livecollabService.roomName;
-			// Only open virtual folder once AND only when we have the room name
-			if (!_virtualFolderAdded && name) {
+			// Only open virtual folder once with correct room name
+			if (!_virtualFolderAdded) {
 				_virtualFolderAdded = true;
-				await this.workspaceEditingService.updateFolders(0, 0, [{ uri, name }]);
+				await this.workspaceEditingService.updateFolders(0, 0, [{ uri, name: roomName }]);
 			}
 		}));
 

@@ -89,7 +89,7 @@ export class LiveCollabCursorContribution extends Disposable implements IEditorC
 		if (!model) { return; }
 		const position = this.editor.getPosition();
 		if (!position) { return; }
-		const fileId = model.uri.toString();
+		const fileId = model.uri.path.split('/').pop() || model.uri.path;
 		livecollabService.emitCursorUpdate(
 			livecollabService.roomId,
 			fileId,
@@ -102,7 +102,8 @@ export class LiveCollabCursorContribution extends Disposable implements IEditorC
 		if (!info) { return; }
 		const model = this.editor.getModel();
 		if (!model) { return; }
-		if (model.uri.toString() !== info.fileId) {
+		const modelFileId = model.uri.path.split('/').pop() || model.uri.path;
+		if (modelFileId !== info.fileId) {
 			this._clearCursorDecorations(socketId);
 			return;
 		}
