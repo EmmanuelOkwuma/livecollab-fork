@@ -154,6 +154,18 @@ export class LiveCollabService extends Disposable {
 		this.socket.emit('chat:send', { roomId, text: content, name: this._displayName });
 	}
 
+	async createInviteCode(): Promise<{ success: boolean; code?: string; error?: string }> {
+		return new Promise((resolve) => {
+			if (!this.socket?.connected || !this._roomId) { resolve({ success: false, error: 'Not in a room' }); return; }
+			this.socket.emit('room:invite:create', { roomId: this._roomId }, (res: any) => {
+				if (res?.code) { resolve({ success: true, code: res.code }); }
+				else { resolve({ success: false, error: res?.error || 'Could not create invite code' }); }
+			});
+		});
+	}
+
+	
+
 	async joinRoom(inviteCode: string): Promise<{ success: boolean; roomId?: string; error?: string }> {
 		return new Promise((resolve) => {
 			if (!this.socket?.connected) { resolve({ success: false, error: 'Not connected' }); return; }
