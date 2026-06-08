@@ -30,7 +30,8 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 			const model = this.editor.getModel();
 			if (!model) { return; }
 
-			const fileId = model.uri.path;
+			// Use filename only as fileId so host and guest paths match
+			const fileId = model.uri.path.split('/').pop() || model.uri.path;
 			const code = model.getValue();
 
 			livecollabService.emitCodeChange(livecollabService.roomId, fileId, code);
@@ -41,7 +42,8 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 		this._register(this.editor.onDidChangeModel(() => {
 			const model = this.editor.getModel();
 			if (!model) { return; }
-			const fileId = model.uri.path;
+			// Use filename only as fileId so host and guest paths match
+			const fileId = model.uri.path.split('/').pop() || model.uri.path;
 			const cached = livecollabService.getFileContent(fileId);
 			if (cached !== undefined && cached !== model.getValue()) {
 				this._isApplyingRemoteChange = true;
@@ -55,12 +57,14 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 
 		// Apply remote code changes to this editor
 		this._register(livecollabService.onCodeChange(({ fileId, code }) => {
+			console.log('[LiveCollab] code change received, fileId:', fileId, 'model uri path:', editor.getModel()?.uri.path);
 			// Always update cache regardless of which file is open
 			livecollabService.updateFileCache(fileId, code);
 			const model = this.editor.getModel();
 			if (!model) { return; }
 
-			if (model.uri.path !== fileId) { return; }
+			const modelFileId = model.uri.path.split('/').pop() || model.uri.path;
+			if (modelFileId !== fileId) { return; }
 
 			this._isApplyingRemoteChange = true;
 			try {

@@ -122,7 +122,7 @@ export class LiveCollabService extends Disposable {
 			this._onMemberJoined.fire();
 		});
 		this.socket.on('room:file:tree', ({ tree, roomName }: { tree: any[], roomName?: string }) => {
-			console.log('[LiveCollab] file tree received:', tree.length, 'items');
+			console.log('[LiveCollab] file tree received:', tree.length, 'items, roomName:', roomName, 'current _roomName:', this._roomName);
 			if (roomName) { this._roomName = roomName; }
 			this._onFileTree.fire(tree);
 		});
@@ -206,7 +206,8 @@ export class LiveCollabService extends Disposable {
 
 	broadcastFileTree(tree: any[]): void {
 		if (!this.socket?.connected || !this._roomId) { return; }
-		this.socket.emit('room:file:tree', { roomId: this._roomId, tree, roomName: this._roomName });
+		console.log('[LiveCollab] broadcasting file tree with roomName:', this._roomName);
+		this.socket.emit('room:file:tree', { roomId: this._roomId, tree, roomName: this._roomName || 'Shared Room' });
 	}
 
 	respondFileContent(ack: any, path: string, fileContent: string): void {
