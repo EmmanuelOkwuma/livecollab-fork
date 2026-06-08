@@ -14,6 +14,7 @@ import { IKeybindingService } from '../../../../platform/keybinding/common/keybi
 import { IOpenerService } from '../../../../platform/opener/common/opener.js';
 import { IThemeService } from '../../../../platform/theme/common/themeService.js';
 import { IHoverService } from '../../../../platform/hover/browser/hover.js';
+import { IClipboardService } from '../../../../platform/clipboard/common/clipboardService.js';
 import { livecollabService, ILiveCollabMember } from './livecollabService.js';
 
 const USER_COLORS = [
@@ -48,6 +49,7 @@ export class LiveCollabMembersView extends ViewPane {
 		@IOpenerService openerService: IOpenerService,
 		@IThemeService themeService: IThemeService,
 		@IHoverService hoverService: IHoverService,
+		@IClipboardService private readonly clipboardService: IClipboardService,
 	) {
 		super(options, keybindingService, contextMenuService, configurationService, contextKeyService, viewDescriptorService, instantiationService, openerService, themeService, hoverService);
 
@@ -122,7 +124,7 @@ export class LiveCollabMembersView extends ViewPane {
 		copyRoomIdBtn.onmouseleave = () => { copyRoomIdBtn.style.color = '#858585'; };
 		copyRoomIdBtn.onclick = () => {
 			if (livecollabService.roomId) {
-				navigator.clipboard.writeText(livecollabService.roomId);
+				this.clipboardService.writeText(livecollabService.roomId || '');
 			}
 		};
 		roomIdRow.appendChild(copyRoomIdBtn);
@@ -159,7 +161,7 @@ export class LiveCollabMembersView extends ViewPane {
 			const copyBtn = document.createElement('button') as HTMLButtonElement;
 			copyBtn.textContent = 'Copy';
 			copyBtn.style.cssText = 'background:transparent;border:none;color:#858585;cursor:pointer;font-size:11px;padding:4px;flex-shrink:0;';
-			copyBtn.onclick = () => { navigator.clipboard.writeText(codeText.textContent || ''); copyBtn.textContent = 'Copied'; setTimeout(() => copyBtn.textContent = 'Copy', 2000); };
+			copyBtn.onclick = () => { this.clipboardService.writeText(codeText.textContent || ''); copyBtn.textContent = 'Copied'; setTimeout(() => copyBtn.textContent = 'Copy', 2000); };
 			codeRow.appendChild(codeText);
 			codeRow.appendChild(copyBtn);
 
