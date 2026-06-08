@@ -34,6 +34,7 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 		// Register livecollab:// file system provider
 		this.fileService.registerProvider(LIVECOLLAB_SCHEME, livecollabFileSystemProvider);
 
+		let _virtualFolderAdded = false;
 		// When file tree arrives — populate virtual file system and open workspace
 		this._register(livecollabService.onFileTree(async (tree) => {
 			const roomId = livecollabService.roomId;
@@ -44,8 +45,11 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 			// Open the virtual folder in the explorer
 			const uri = URI.file('/').with({ scheme: LIVECOLLAB_SCHEME, authority: roomId, path: '/' });
 			const name = livecollabService.roomName || 'Shared Room';
-			// Add virtual folder to workspace with proper name
-			await this.workspaceEditingService.updateFolders(0, 0, [{ uri, name }]);
+			// Add virtual folder to workspace only once
+			if (!_virtualFolderAdded) {
+				_virtualFolderAdded = true;
+				await this.workspaceEditingService.updateFolders(0, 0, [{ uri, name }]);
+			}
 		}));
 
 		// When a new member joins — re-broadcast file tree to room

@@ -112,7 +112,8 @@ export class LiveCollabService extends Disposable {
 			this._lastMembers = members;
 			this._onMembersChanged.fire(members);
 		});
-		this.socket.on('code:change', (payload: { fileId: string; code: string }) => {
+		this.socket.on('code:change', (payload: { fileId: string; code: string; senderSocketId?: string }) => {
+			if (payload.senderSocketId === this.socket?.id) { return; } // ignore own changes
 			this._fileCache.set(payload.fileId, payload.code);
 			this._onCodeChange.fire(payload);
 		});
@@ -179,7 +180,7 @@ export class LiveCollabService extends Disposable {
 
 	emitCodeChange(roomId: string, fileId: string, code: string): void {
 		if (!this.socket?.connected) { return; }
-		this.socket.emit('code:change', { roomId, fileId, code });
+		this.socket.emit('code:change', { roomId, fileId, code, senderSocketId: this.socket.id });
 	}
 
 	emitCursorUpdate(roomId: string, fileId: string, position: { lineNumber: number; column: number }): void {
