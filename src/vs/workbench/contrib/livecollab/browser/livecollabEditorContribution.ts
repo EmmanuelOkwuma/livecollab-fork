@@ -60,7 +60,7 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 			const model = this.editor.getModel();
 			if (!model) { return; }
 
-			if (model.uri.toString() !== fileId) { return; }
+			if (model.uri.path !== fileId) { return; }
 
 			this._isApplyingRemoteChange = true;
 			try {

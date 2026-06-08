@@ -118,11 +118,12 @@ export class LiveCollabService extends Disposable {
 		});
 		this.socket.on('cursor:update', (payload: any) => { this._onCursorUpdate.fire(payload); });
 		this.socket.on('cursor:leave', (payload: any) => { this._onCursorLeave.fire(payload); });
-		this.socket.on('room:member:joined', () => {
+		this.socket.on('room:member:joined', ({ roomName }: { roomName?: string }) => {
 			this._onMemberJoined.fire();
 		});
-		this.socket.on('room:file:tree', ({ tree }: { tree: any[] }) => {
+		this.socket.on('room:file:tree', ({ tree, roomName }: { tree: any[], roomName?: string }) => {
 			console.log('[LiveCollab] file tree received:', tree.length, 'items');
+			if (roomName) { this._roomName = roomName; }
 			this._onFileTree.fire(tree);
 		});
 		this.socket.on('room:file:content', ({ path, content }: { path: string; content: string }) => {
@@ -205,7 +206,7 @@ export class LiveCollabService extends Disposable {
 
 	broadcastFileTree(tree: any[]): void {
 		if (!this.socket?.connected || !this._roomId) { return; }
-		this.socket.emit('room:file:tree', { roomId: this._roomId, tree });
+		this.socket.emit('room:file:tree', { roomId: this._roomId, tree, roomName: this._roomName });
 	}
 
 	respondFileContent(ack: any, path: string, fileContent: string): void {
