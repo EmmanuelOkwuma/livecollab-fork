@@ -60,6 +60,15 @@ export class LiveCollabService extends Disposable {
 	private readonly _onCursorLeave = this._register(new Emitter<{ socketId: string }>());
 	readonly onCursorLeave: Event<{ socketId: string }> = this._onCursorLeave.event;
 
+	private readonly _onFileContentRequest = this._register(new Emitter<{ path: string; ack: any }>());
+	readonly onFileContentRequest: Event<{ path: string; ack: any }> = this._onFileContentRequest.event;
+
+	private readonly _onFileTree = this._register(new Emitter<any[]>());
+	readonly onFileTree: Event<any[]> = this._onFileTree.event;
+
+	private readonly _onFileContent = this._register(new Emitter<{ path: string; content: string }>());
+	readonly onFileContent: Event<{ path: string; content: string }> = this._onFileContent.event;
+
 	get isConnected(): boolean { return this.socket?.connected ?? false; }
 	get roomId(): string | undefined { return this._roomId; }
 	get token(): string | undefined { return this._token; }
@@ -104,6 +113,19 @@ export class LiveCollabService extends Disposable {
 		});
 		this.socket.on('cursor:update', (payload: any) => { this._onCursorUpdate.fire(payload); });
 		this.socket.on('cursor:leave', (payload: any) => { this._onCursorLeave.fire(payload); });
+		this.socket.on('room:file:tree', ({ tree }: { tree: any[] }) => {
+			console.log('[LiveCollab] file tree received:', tree.length, 'items');
+			this._onFileTree.fire(tree);
+		});
+		this.socket.on('room:file:content', ({ path, content }: { path: string; content: string }) => {
+			console.log('[LiveCollab] file content received:', path);
+			this._onFileContent.fire({ path, content });
+		});
+		// Handle file content requests from guests
+		this.socket.on('room:file:request', ({ path }: { path: string }, ack: any) => {
+			console.log('[LiveCollab] file content requested:', path);
+			this._onFileContentRequest.fire({ path, ack });
+		});
 		this.socket.on('room:state', (state: any) => {
 			if (state?.files) {
 				for (const f of state.files) { this._fileCache.set(f.id, f.content || ''); }
@@ -171,6 +193,21 @@ export class LiveCollabService extends Disposable {
 	}
 
 	
+
+	broadcastFileTree(tree: any[]): void {
+		if (!this.socket?.connected || !this._roomId) { return; }
+		this.socket.emit('room:file:tree', { roomId: this._roomId, tree });
+	}
+
+	respondFileContent(ack: any, path: string, fileContent: string): void {
+		if (!this.socket?.connected) { return; }
+		this.socket.emit('room:file:response', { requesterId: ack, path, content: fileContent });
+	}
+
+	requestFileContent(path: string): void {
+		if (!this.socket?.connected || !this._roomId) { return; }
+		this.socket.emit('room:file:request', { roomId: this._roomId, path });
+	}
 
 	async joinRoom(inviteCode: string): Promise<{ success: boolean; roomId?: string; error?: string }> {
 		return new Promise((resolve) => {
