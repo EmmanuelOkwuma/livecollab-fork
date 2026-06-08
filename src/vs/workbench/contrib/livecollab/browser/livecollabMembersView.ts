@@ -131,60 +131,57 @@ export class LiveCollabMembersView extends ViewPane {
 
 		// Invite section
 		const inviteSection = document.createElement('div');
-		inviteSection.style.padding = '8px 12px';
-		inviteSection.style.borderBottom = '1px solid #2b2b2b';
+			inviteSection.style.padding = '8px 12px';
+			inviteSection.style.borderBottom = '1px solid #2b2b2b';
 
-		const inviteLabel = document.createElement('div');
-		inviteLabel.style.fontSize = '11px';
-		inviteLabel.style.color = '#858585';
-		inviteLabel.style.marginBottom = '6px';
-		inviteLabel.style.textTransform = 'uppercase';
-		inviteLabel.style.letterSpacing = '0.08em';
-		inviteLabel.textContent = 'Invite';
-		inviteSection.appendChild(inviteLabel);
+			const inviteLabel = document.createElement('div');
+			inviteLabel.style.cssText = 'font-size:11px;color:#858585;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.08em;';
+			inviteLabel.textContent = 'Invite';
+			inviteSection.appendChild(inviteLabel);
 
-		const createInviteBtn = document.createElement('button');
-		createInviteBtn.style.background = '#1e1e1e';
-		createInviteBtn.style.border = '1px solid #2b2b2b';
-		createInviteBtn.style.color = '#cccccc';
-		createInviteBtn.style.borderRadius = '4px';
-		createInviteBtn.style.padding = '4px 8px';
-		createInviteBtn.style.fontSize = '12px';
-		createInviteBtn.style.cursor = 'pointer';
-		createInviteBtn.style.textAlign = 'left';
-		createInviteBtn.style.width = '100%';
-		createInviteBtn.textContent = 'Create invite code';
-		createInviteBtn.onmouseenter = () => { createInviteBtn.style.borderColor = '#007ACC'; };
-		createInviteBtn.onmouseleave = () => { createInviteBtn.style.borderColor = '#2b2b2b'; };
-			// Code display row — reused on every creation
+			// Only owner can create invite codes
+			
+
+			const inviteBody = document.createElement('div');
+			inviteBody.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
+
+			const createInviteBtn = document.createElement('button') as HTMLButtonElement;
+			createInviteBtn.style.cssText = 'background:#1e1e1e;border:1px solid #2b2b2b;color:#cccccc;border-radius:4px;padding:4px 8px;font-size:12px;cursor:pointer;text-align:left;width:100%;';
+			createInviteBtn.textContent = 'Create invite code';
+			createInviteBtn.onmouseenter = () => { createInviteBtn.style.borderColor = '#007ACC'; };
+			createInviteBtn.onmouseleave = () => { createInviteBtn.style.borderColor = '#2b2b2b'; };
+
+			// Code row — hidden until code is created
 			const codeRow = document.createElement('div');
-			codeRow.style.cssText = 'margin-top:6px;display:none;align-items:center;gap:6px;';
+			codeRow.style.cssText = 'display:none;align-items:center;gap:8px;background:#1e1e1e;border:1px solid #2b2b2b;border-radius:4px;padding:4px 8px;';
 			const codeText = document.createElement('span');
-			codeText.style.cssText = 'flex:1;font-size:11px;font-family:monospace;color:#cccccc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-			const copyBtn = document.createElement('button');
+			codeText.style.cssText = 'font-size:11px;color:#cccccc;font-family:monospace;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+			const copyBtn = document.createElement('button') as HTMLButtonElement;
 			copyBtn.textContent = 'Copy';
-			copyBtn.style.cssText = 'background:transparent;border:none;color:#007ACC;font-size:11px;cursor:pointer;flex-shrink:0;';
-			copyBtn.onclick = () => { navigator.clipboard.writeText(codeText.textContent || ''); copyBtn.textContent = 'Copied!'; setTimeout(() => copyBtn.textContent = 'Copy', 2000); };
+			copyBtn.style.cssText = 'background:transparent;border:none;color:#858585;cursor:pointer;font-size:11px;padding:4px;flex-shrink:0;';
+			copyBtn.onclick = () => { navigator.clipboard.writeText(codeText.textContent || ''); copyBtn.textContent = 'Copied'; setTimeout(() => copyBtn.textContent = 'Copy', 2000); };
 			codeRow.appendChild(codeText);
 			codeRow.appendChild(copyBtn);
-			inviteSection.appendChild(codeRow);
 
 			createInviteBtn.onclick = async () => {
 				createInviteBtn.textContent = 'Creating...';
-				(createInviteBtn as HTMLButtonElement).disabled = true;
+				createInviteBtn.disabled = true;
 				const result = await livecollabService.createInviteCode();
 				if (result.success && result.code) {
 					codeText.textContent = result.code;
 					codeRow.style.display = 'flex';
-					createInviteBtn.textContent = 'New invite code';
+					createInviteBtn.textContent = 'Create invite code';
 				} else {
 					createInviteBtn.textContent = result.error || 'Failed';
 					setTimeout(() => createInviteBtn.textContent = 'Create invite code', 2000);
 				}
-				(createInviteBtn as HTMLButtonElement).disabled = false;
+				createInviteBtn.disabled = false;
 			};
-		inviteSection.appendChild(createInviteBtn);
-		container.appendChild(inviteSection);
+
+			inviteBody.appendChild(createInviteBtn);
+			inviteBody.appendChild(codeRow);
+			inviteSection.appendChild(inviteBody);
+			container.appendChild(inviteSection);
 
 		// Members list
 		this.membersContainer = document.createElement('div');
