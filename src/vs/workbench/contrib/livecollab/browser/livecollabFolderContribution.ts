@@ -8,6 +8,7 @@ import { IWorkbenchContribution } from '../../../common/contributions.js';
 import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
 import { ISecretStorageService } from '../../../../platform/secrets/common/secrets.js';
 import { livecollabService } from './livecollabService.js';
+import { livecollabFileSystemProvider, LIVECOLLAB_SCHEME } from './livecollabFileSystemProvider.js';
 import { IFileService } from '../../../../platform/files/common/files.js';
 import { URI } from '../../../../base/common/uri.js';
 
@@ -26,6 +27,27 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 		this._register(livecollabService.onConnected(() => {
 			console.log('[LiveCollab] socket connected — checking folder');
 			this._registerFolderAsRoom();
+		}));
+
+		// Register livecollab:// file system provider
+		this.fileService.registerProvider(LIVECOLLAB_SCHEME, livecollabFileSystemProvider);
+
+		// When file tree arrives — populate virtual file system and open workspace
+		this._register(livecollabService.onFileTree(async (tree) => {
+			const roomId = livecollabService.roomId;
+			if (!roomId) { return; }
+			console.log('[LiveCollab] populating virtual file system with tree:', tree.length, 'items');
+			livecollabFileSystemProvider.setRoomId(roomId);
+			await livecollabFileSystemProvider.populateFromTree(tree);
+			// Open the virtual folder in the explorer
+			const folderUri = { scheme: LIVECOLLAB_SCHEME, authority: roomId, path: '/' };
+			const { URI: UriClass } = await import('../../../../base/common/uri.js');
+			const uri = UriClass.from(folderUri);
+			// Add to workspace
+			const workspaceService = this.workspaceContextService as any;
+			if (workspaceService.addFolders) {
+				await workspaceService.addFolders([{ uri }]);
+			}
 		}));
 
 		// Handle file content requests from guests
