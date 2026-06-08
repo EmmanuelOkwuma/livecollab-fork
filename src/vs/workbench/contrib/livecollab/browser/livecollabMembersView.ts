@@ -198,6 +198,13 @@ export class LiveCollabMembersView extends ViewPane {
 	private updateMembersList(): void {
 		if (!this.membersContainer) { return; }
 		while (this.membersContainer.firstChild) { this.membersContainer.removeChild(this.membersContainer.firstChild); }
+		if (this.members.length === 0) {
+			const empty = document.createElement('div');
+			empty.style.cssText = 'padding:12px;font-size:12px;color:#858585;text-align:center;';
+			empty.textContent = 'Open a folder to start collaborating';
+			this.membersContainer.appendChild(empty);
+			return;
+		}
 
 		if (this.members.length === 0) {
 			const empty = document.createElement('div');

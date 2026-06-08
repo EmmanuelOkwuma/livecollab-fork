@@ -136,6 +136,12 @@ export class LiveCollabService extends Disposable {
 	}
 
 	getRoomIdForFolder(folderPath: string): string | undefined { return this._folderRoomCache.get(folderPath); }
+
+	clearRoom(): void {
+		this._roomId = undefined;
+		this._lastMembers = [];
+		this._onMembersChanged.fire([]);
+	}
 	getFileContent(fileId: string): string | undefined { return this._fileCache.get(fileId); }
 	updateFileCache(fileId: string, code: string): void { this._fileCache.set(fileId, code); }
 
