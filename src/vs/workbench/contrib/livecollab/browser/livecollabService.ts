@@ -63,6 +63,9 @@ export class LiveCollabService extends Disposable {
 	private readonly _onFileContentRequest = this._register(new Emitter<{ path: string; ack: any }>());
 	readonly onFileContentRequest: Event<{ path: string; ack: any }> = this._onFileContentRequest.event;
 
+	private readonly _onMemberJoined = this._register(new Emitter<void>());
+	readonly onMemberJoined: Event<void> = this._onMemberJoined.event;
+
 	private readonly _onFileTree = this._register(new Emitter<any[]>());
 	readonly onFileTree: Event<any[]> = this._onFileTree.event;
 
@@ -113,6 +116,9 @@ export class LiveCollabService extends Disposable {
 		});
 		this.socket.on('cursor:update', (payload: any) => { this._onCursorUpdate.fire(payload); });
 		this.socket.on('cursor:leave', (payload: any) => { this._onCursorLeave.fire(payload); });
+		this.socket.on('room:member:joined', () => {
+			this._onMemberJoined.fire();
+		});
 		this.socket.on('room:file:tree', ({ tree }: { tree: any[] }) => {
 			console.log('[LiveCollab] file tree received:', tree.length, 'items');
 			this._onFileTree.fire(tree);

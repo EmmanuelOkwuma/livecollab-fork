@@ -50,6 +50,14 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 			}
 		}));
 
+		// When a new member joins — re-broadcast file tree to room
+		this._register(livecollabService.onMemberJoined(async () => {
+			const folders = this.workspaceContextService.getWorkspace().folders;
+			if (!folders || folders.length === 0) { return; }
+			console.log('[LiveCollab] new member joined — re-broadcasting file tree');
+			await this._broadcastFileTree(folders[0].uri);
+		}));
+
 		// Handle file content requests from guests
 		this._register(livecollabService.onFileContentRequest(async ({ path, ack }) => {
 			try {
