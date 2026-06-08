@@ -95,6 +95,12 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 			return;
 		}
 
+		// Skip if this is a virtual livecollab:// folder — guest already in a room
+		if (folders.some(f => f.uri.scheme === LIVECOLLAB_SCHEME)) {
+			console.log('[LiveCollab] virtual folder detected — skipping room creation');
+			return;
+		}
+
 		const folder = folders[0];
 		const folderPath = folder.uri.fsPath;
 		const folderName = folder.name;
