@@ -30,7 +30,7 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 			const model = this.editor.getModel();
 			if (!model) { return; }
 
-			const fileId = model.uri.toString();
+			const fileId = model.uri.path;
 			const code = model.getValue();
 
 			livecollabService.emitCodeChange(livecollabService.roomId, fileId, code);
@@ -41,7 +41,7 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 		this._register(this.editor.onDidChangeModel(() => {
 			const model = this.editor.getModel();
 			if (!model) { return; }
-			const fileId = model.uri.toString();
+			const fileId = model.uri.path;
 			const cached = livecollabService.getFileContent(fileId);
 			if (cached !== undefined && cached !== model.getValue()) {
 				this._isApplyingRemoteChange = true;

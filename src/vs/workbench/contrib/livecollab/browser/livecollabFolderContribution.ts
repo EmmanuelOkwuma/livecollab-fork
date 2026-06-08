@@ -43,8 +43,9 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 			await livecollabFileSystemProvider.populateFromTree(tree);
 			// Open the virtual folder in the explorer
 			const uri = URI.file('/').with({ scheme: LIVECOLLAB_SCHEME, authority: roomId, path: '/' });
-			// Add virtual folder to workspace
-			await this.workspaceEditingService.updateFolders(0, 0, [{ uri }]);
+			const name = livecollabService.roomName || 'Shared Room';
+			// Add virtual folder to workspace with proper name
+			await this.workspaceEditingService.updateFolders(0, 0, [{ uri, name }]);
 		}));
 
 		// When a new member joins — re-broadcast file tree to room

@@ -30,6 +30,7 @@ export class LiveCollabService extends Disposable {
 	private socket: any = null;
 	private _token: string | undefined;
 	private _roomId: string | undefined;
+	private _roomName: string | undefined;
 	private _displayName: string = 'User';
 	private _folderRoomCache: Map<string, string> = new Map();
 	private _lastMembers: ILiveCollabMember[] = [];
@@ -74,6 +75,7 @@ export class LiveCollabService extends Disposable {
 
 	get isConnected(): boolean { return this.socket?.connected ?? false; }
 	get roomId(): string | undefined { return this._roomId; }
+	get roomName(): string | undefined { return this._roomName; }
 	get token(): string | undefined { return this._token; }
 	get lastMembers(): ILiveCollabMember[] { return this._lastMembers; }
 
@@ -147,6 +149,7 @@ export class LiveCollabService extends Disposable {
 			this.socket.emit('room:create', { name: folderName }, (res: any) => {
 				if (res?.roomId) {
 					this._roomId = res.roomId;
+					this._roomName = folderName;
 					this._folderRoomCache.set(folderPath, res.roomId);
 					console.log('[LiveCollab] room created:', res.roomId);
 				}
