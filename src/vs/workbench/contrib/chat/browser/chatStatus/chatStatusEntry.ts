@@ -81,6 +81,7 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
 	}
 
 	private update(): void {
+		const _livecollabHidden = true; if (_livecollabHidden) { return; } // LiveCollab: hide Copilot status bar icon
 		const sentiment = this.chatEntitlementService.sentiment;
 		if (!sentiment.hidden) {
 			const props = this.getEntryProps();
@@ -249,6 +250,7 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
 	}
 
 	private isSignInTitleBarAffordanceVisible(): boolean {
+		const _livecollabHidden = true; if (_livecollabHidden) { return false; } // LiveCollab: hide Copilot sign in button
 		if (isWeb) {
 			return false;
 		}
