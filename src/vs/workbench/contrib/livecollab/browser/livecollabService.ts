@@ -173,8 +173,14 @@ export class LiveCollabService extends Disposable {
 
 	clearRoom(): void {
 		this._roomId = undefined;
+		this._roomName = undefined;
 		this._lastMembers = [];
 		this._onMembersChanged.fire([]);
+	}
+
+	clearFolder(): void {
+		// Only clears file state — room, members, chat stay intact
+		this._fileCache.clear();
 	}
 	getFileContent(fileId: string): string | undefined { return this._fileCache.get(fileId); }
 	updateFileCache(fileId: string, code: string): void { this._fileCache.set(fileId, code); }

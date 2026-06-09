@@ -94,8 +94,8 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 	private async _registerFolderAsRoom(): Promise<void> {
 		const folders = this.workspaceContextService.getWorkspace().folders;
 		if (!folders || folders.length === 0) {
-			// No folder open — clear members panel
-			livecollabService.clearRoom();
+			// No folder open — clear file state only, room and members stay
+			livecollabService.clearFolder();
 			return;
 		}
 
