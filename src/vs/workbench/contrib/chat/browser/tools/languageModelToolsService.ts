@@ -175,7 +175,7 @@ export class LanguageModelToolsService extends Disposable implements ILanguageMo
 			'vscode',
 			VSCodeToolReference.vscode,
 			{
-				icon: ThemeIcon.fromId(Codicon.vscode.id),
+				icon: ThemeIcon.fromId(Codicon.tools.id), // LiveCollab: was Codicon.vscode (Microsoft logo)
 				description: localize('copilot.toolSet.vscode.description', 'Use LiveCollab features'),
 			}
 		));
