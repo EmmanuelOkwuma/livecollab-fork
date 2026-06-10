@@ -252,7 +252,7 @@ export class IssueReporterOverlay {
 		heading.textContent = localize('screenshotsHeading', "Add attachments for better context");
 
 		const subtitle = append(page, $('p.wizard-subtitle'));
-		subtitle.textContent = localize('screenshotsSubtitle', "You can add up to {0} screenshots or videos. Navigate VS Code and choose when to capture.", MAX_ATTACHMENTS);
+		subtitle.textContent = localize('screenshotsSubtitle', "You can add up to {0} screenshots or videos. Navigate LiveCollab and choose when to capture.", MAX_ATTACHMENTS);
 
 		const captureShortcut = this.resolveKeybinding?.('workbench.action.issueReporter.captureScreenshot');
 		const recordShortcut = this.recordingSupported ? this.resolveKeybinding?.('workbench.action.issueReporter.toggleRecording') : undefined;
@@ -287,7 +287,7 @@ export class IssueReporterOverlay {
 
 	private createFloatingCaptureBar(): void {
 		const targetWindow = getWindow(this.container);
-		// Mount inside .monaco-workbench so VS Code's color theme CSS vars
+		// Mount inside .monaco-workbench so LiveCollab's color theme CSS vars
 		// (--vscode-debugToolBar-background, etc.) cascade and the bar matches the
 		// active theme. body is outside that scope and the vars wouldn't resolve.
 		// eslint-disable-next-line no-restricted-syntax
@@ -309,7 +309,7 @@ export class IssueReporterOverlay {
 		captureBtn.label = `$(device-camera) ${localize('screenshot', "Screenshot")}`;
 		this.captureStripCaptureBtn = captureBtn;
 
-		// Delay/options dropdown using VS Code's context menu
+		// Delay/options dropdown using LiveCollab's context menu
 		const delayOptions = this.getScreenshotDelayOptions();
 		const delayDropdownButton = this.disposables.add(new Button(segmented, { ...floatingButtonStyles, supportIcons: true }));
 		delayDropdownButton.element.classList.add('wizard-segmented-dropdown');
@@ -681,7 +681,7 @@ export class IssueReporterOverlay {
 	private getSourceOptions(): { label: string; value: IssueSource }[] {
 		const options: { label: string; value: IssueSource }[] = [
 			{ label: product.nameLong || localize('vscode', "Visual Studio Code"), value: IssueSource.VSCode },
-			{ label: localize('extensionSource', "A VS Code extension"), value: IssueSource.Extension },
+			{ label: localize('extensionSource', "A LiveCollab extension"), value: IssueSource.Extension },
 			{ label: localize('marketplace', "Extensions Marketplace"), value: IssueSource.Marketplace },
 		];
 		return options;
@@ -908,7 +908,7 @@ export class IssueReporterOverlay {
 			case IssueSource.VSCode:
 				return product.nameLong || localize('vscode', "Visual Studio Code");
 			case IssueSource.Extension:
-				return this.selectedExtension?.displayName || this.selectedExtension?.name || localize('extensionSource', "A VS Code extension");
+				return this.selectedExtension?.displayName || this.selectedExtension?.name || localize('extensionSource', "A LiveCollab extension");
 			case IssueSource.Marketplace:
 				return localize('marketplace', "Extensions Marketplace");
 			case IssueSource.Unknown:
@@ -1393,7 +1393,7 @@ export class IssueReporterOverlay {
 				renderContent: (container) => {
 					const sysTable = append(container, $('table.review-diag-table'));
 					if (modelData.versionInfo) {
-						this.addDiagRow(sysTable, 'VS Code', modelData.versionInfo.vscodeVersion);
+						this.addDiagRow(sysTable, 'LiveCollab', modelData.versionInfo.vscodeVersion);
 						this.addDiagRow(sysTable, 'OS', modelData.versionInfo.os);
 					}
 					if (modelData.systemInfo) {
@@ -2036,7 +2036,7 @@ export class IssueReporterOverlay {
 		const rows: [string, string | undefined][] = [
 			['Issue Category', this.getIssueTypeTitle(this.selectedIssueType ?? IssueType.Bug)],
 			['Target', this.getIssueSourceLabel()],
-			['VS Code Version', modelData.versionInfo?.vscodeVersion ?? product.version],
+			['LiveCollab Version', modelData.versionInfo?.vscodeVersion ?? product.version],
 			['OS Version', modelData.versionInfo?.os ?? modelData.systemInfo?.os],
 		];
 
@@ -2057,7 +2057,7 @@ export class IssueReporterOverlay {
 
 		if (modelData.versionInfo) {
 			rows.push(
-				['VS Code Version', modelData.versionInfo.vscodeVersion],
+				['LiveCollab Version', modelData.versionInfo.vscodeVersion],
 				['OS Version', modelData.versionInfo.os],
 			);
 		}

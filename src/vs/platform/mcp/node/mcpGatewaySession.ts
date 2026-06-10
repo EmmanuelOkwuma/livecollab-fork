@@ -209,7 +209,7 @@ export class McpGatewaySession extends Disposable {
 				},
 			},
 			serverInfo: {
-				name: 'VS Code MCP Gateway',
+				name: 'LiveCollab MCP Gateway',
 				version: '1.0.0',
 			}
 		};

@@ -200,7 +200,7 @@ export function isClaimedByDedicatedPicker(property: string, schema: SessionConf
  * property. Used both for dedicated well-known property chips
  * (`SessionConfigKey.Mode`, `.Isolation`, `.Branch`, `.AutoApprove`) and for
  * generic per-property chips advertised by an agent's config schema but not
- * known to VS Code.
+ * known to LiveCollab.
  */
 export class AgentHostChatInputPicker extends Disposable {
 
