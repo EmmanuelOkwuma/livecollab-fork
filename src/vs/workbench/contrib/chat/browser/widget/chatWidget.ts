@@ -69,7 +69,7 @@ import { ChatAgentLocation, ChatConfiguration, ChatModeKind, ChatPermissionLevel
 import { ILanguageModelToolsService, isToolSet } from '../../common/tools/languageModelToolsService.js';
 import { IHandOff, PromptHeader } from '../../common/promptSyntax/promptFileParser.js';
 import { IPromptsService, PromptsStorage } from '../../common/promptSyntax/service/promptsService.js';
-import { GENERATE_AGENT_INSTRUCTIONS_COMMAND_ID, handleModeSwitch } from '../actions/chatActions.js';
+import { handleModeSwitch } from '../actions/chatActions.js';
 import { ChatTreeItem, IChatAcceptInputOptions, IChatAccessibilityService, IChatCodeBlockInfo, IChatFileTreeInfo, IChatListItemRendererOptions, IChatWidget, IChatWidgetService, IChatWidgetViewContext, IChatWidgetViewModelChangeEvent, IChatWidgetViewOptions, isIChatResourceViewContext, isIChatViewViewContext } from '../chat.js';
 import { ChatAttachmentModel } from '../attachments/chatAttachmentModel.js';
 import { IChatAttachmentResolveService } from '../attachments/chatAttachmentResolveService.js';
@@ -1170,12 +1170,8 @@ export class ChatWidget extends Disposable implements IChatWidget {
 			// Don't show generate instructions message if files exist
 			return new MarkdownString('');
 		} else if (this._instructionFilesExist === false) {
-			// Show generate instructions message if no files exist
-			return new MarkdownString(localize(
-				'chatWidget.instructions',
-				"[Generate Agent Instructions]({0}) to onboard AI onto your codebase.",
-				`command:${GENERATE_AGENT_INSTRUCTIONS_COMMAND_ID}`
-			), { isTrusted: { enabledCommands: [GENERATE_AGENT_INSTRUCTIONS_COMMAND_ID] } });
+			// LiveCollab: hide Generate Agent Instructions link (Copilot trigger)
+			return new MarkdownString('');
 		}
 
 		// While checking, don't show the generate instructions message
@@ -1228,7 +1224,7 @@ export class ChatWidget extends Disposable implements IChatWidget {
 		} else if (this.input.currentModeKind === ChatModeKind.Edit) {
 			title = localize('editsTitle', "Edit in context");
 		} else {
-			title = localize('agentTitle', "Build with Agent");
+			title = localize('agentTitle', "LiveCollab AI \u2014 Coming Soon");
 		}
 
 		return {
