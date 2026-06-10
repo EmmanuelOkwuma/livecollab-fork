@@ -10,7 +10,7 @@ declare module 'vscode' {
 		 *
 		 * Messages with "Information" style support links in markdown syntax:
 		 * - Click to [run a command](command:workbench.action.OpenQuickPick)
-		 * - Click to [open a website](https://aka.ms)
+		 * - Click to open a website
 		 *
 		 * Commands may optionally return { triggerSearch: true } to signal to the editor that the original search should run be again.
 		 */

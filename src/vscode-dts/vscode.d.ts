@@ -931,7 +931,7 @@ declare module 'vscode' {
 
 	/**
 	 * A reference to a named icon. Currently, {@link ThemeIcon.File File}, {@link ThemeIcon.Folder Folder},
-	 * and [ThemeIcon ids](https://code.visualstudio.com/api/references/icons-in-labels#icon-listing) are supported.
+	 * and ThemeIcon ids are supported.
 	 * Using a theme icon is preferred over a custom icon as it gives product theme authors the possibility to change the icons.
 	 *
 	 * *Note* that theme icons can also be rendered inside labels and descriptions. Places that support theme icons spell this out
@@ -2531,7 +2531,7 @@ declare module 'vscode' {
 		 * Base kind for source actions: `source`
 		 *
 		 * Source code actions apply to the entire file. They must be explicitly requested and will not show in the
-		 * normal [lightbulb](https://code.visualstudio.com/docs/editor/editingevolved#_code-action) menu. Source actions
+		 * normal lightbulb menu. Source actions
 		 * can be run on save using `editor.codeActionsOnSave` and are also shown in the `source` context menu.
 		 */
 		static readonly Source: CodeActionKind;
@@ -2643,7 +2643,7 @@ declare module 'vscode' {
 		/**
 		 * Requested kind of actions to return.
 		 *
-		 * Actions not of this kind are filtered out before being shown by the [lightbulb](https://code.visualstudio.com/docs/editor/editingevolved#_code-action).
+		 * Actions not of this kind are filtered out before being shown by the lightbulb.
 		 */
 		readonly only: CodeActionKind | undefined;
 	}
@@ -2698,13 +2698,13 @@ declare module 'vscode' {
 		/**
 		 * Marks that the code action cannot currently be applied.
 		 *
-		 * - Disabled code actions are not shown in automatic [lightbulb](https://code.visualstudio.com/docs/editor/editingevolved#_code-action)
+		 * - Disabled code actions are not shown in automatic lightbulb
 		 * code action menu.
 		 *
 		 * - Disabled actions are shown as faded out in the code action menu when the user request a more specific type
 		 * of code action, such as refactorings.
 		 *
-		 * - If the user has a [keybinding](https://code.visualstudio.com/docs/editor/refactoring#_keybindings-for-code-actions)
+		 * - If the user has a keybinding
 		 * that auto applies a code action and only a disabled code actions are returned, the editor will show the user an
 		 * error message with `reason` in the editor.
 		 */
@@ -2734,7 +2734,7 @@ declare module 'vscode' {
 	 *
 	 * Code actions are surfaced to users in a few different ways:
 	 *
-	 * - The [lightbulb](https://code.visualstudio.com/docs/editor/editingevolved#_code-action) feature, which shows
+	 * - The lightbulb feature, which shows
 	 *   a list of code actions at the current cursor position. The lightbulb's list of actions includes both quick fixes
 	 *   and refactorings.
 	 * - As commands that users can run, such as `Refactor`. Users can run these from the command palette or with keybindings.
@@ -2919,7 +2919,7 @@ declare module 'vscode' {
 
 	/**
 	 * The definition provider interface defines the contract between extensions and
-	 * the [go to definition](https://code.visualstudio.com/docs/editor/editingevolved#_go-to-definition)
+	 * the go to definition
 	 * and peek definition features.
 	 */
 	export interface DefinitionProvider {
@@ -3139,7 +3139,7 @@ declare module 'vscode' {
 
 	/**
 	 * The hover provider interface defines the contract between extensions and
-	 * the [hover](https://code.visualstudio.com/docs/editor/intellisense)-feature.
+	 * the hover-feature.
 	 */
 	export interface HoverProvider {
 
@@ -3633,7 +3633,7 @@ declare module 'vscode' {
 
 	/**
 	 * The document symbol provider interface defines the contract between extensions and
-	 * the [go to symbol](https://code.visualstudio.com/docs/editor/editingevolved#_go-to-symbol)-feature.
+	 * the go to symbol-feature.
 	 */
 	export interface DocumentSymbolProvider {
 
@@ -3660,7 +3660,7 @@ declare module 'vscode' {
 
 	/**
 	 * The workspace symbol provider interface defines the contract between extensions and
-	 * the [symbol search](https://code.visualstudio.com/docs/editor/editingevolved#_open-symbol-by-name)-feature.
+	 * the symbol search-feature.
 	 */
 	export interface WorkspaceSymbolProvider<T extends SymbolInformation = SymbolInformation> {
 
@@ -3712,7 +3712,7 @@ declare module 'vscode' {
 
 	/**
 	 * The reference provider interface defines the contract between extensions and
-	 * the [find references](https://code.visualstudio.com/docs/editor/editingevolved#_peek)-feature.
+	 * the find references-feature.
 	 */
 	export interface ReferenceProvider {
 
@@ -4132,7 +4132,7 @@ declare module 'vscode' {
 	 * and `${3:foo}`. `$0` defines the final tab stop, it defaults to
 	 * the end of the snippet. Variables are defined with `$name` and
 	 * `${name:default value}`. Also see
-	 * [the full snippet syntax](https://code.visualstudio.com/docs/editor/userdefinedsnippets#_create-your-own-snippets).
+	 * the full snippet syntax.
 	 */
 	export class SnippetString {
 
@@ -4204,7 +4204,7 @@ declare module 'vscode' {
 
 	/**
 	 * The rename provider interface defines the contract between extensions and
-	 * the [rename](https://code.visualstudio.com/docs/editor/editingevolved#_rename-symbol)-feature.
+	 * the rename-feature.
 	 */
 	export interface RenameProvider {
 
@@ -4765,7 +4765,7 @@ declare module 'vscode' {
 
 	/**
 	 * The signature help provider interface defines the contract between extensions and
-	 * the [parameter hints](https://code.visualstudio.com/docs/editor/intellisense)-feature.
+	 * the parameter hints-feature.
 	 */
 	export interface SignatureHelpProvider {
 
@@ -5175,7 +5175,7 @@ declare module 'vscode' {
 
 	/**
 	 * The completion item provider interface defines the contract between extensions and
-	 * [IntelliSense](https://code.visualstudio.com/docs/editor/intellisense).
+	 * IntelliSense.
 	 *
 	 * Providers can delay the computation of the {@linkcode CompletionItem.detail detail}
 	 * and {@linkcode CompletionItem.documentation documentation} properties by implementing the
@@ -5795,7 +5795,7 @@ declare module 'vscode' {
 
 	/**
 	 * The folding range provider interface defines the contract between extensions and
-	 * [Folding](https://code.visualstudio.com/docs/editor/codebasics#_folding) in the editor.
+	 * Folding in the editor.
 	 */
 	export interface FoldingRangeProvider {
 
@@ -6816,7 +6816,7 @@ declare module 'vscode' {
 	 * const values = config.get('configurations');
 	 * ```
 	 *
-	 * Refer to [Settings](https://code.visualstudio.com/docs/getstarted/settings) for more information.
+	 * Refer to Settings for more information.
 	 */
 	export interface WorkspaceConfiguration {
 
@@ -7170,7 +7170,7 @@ declare module 'vscode' {
 		/**
 		 * The name of this diagnostic collection, for instance `typescript`. Every diagnostic
 		 * from this collection will be associated with this name. Also, the task framework uses this
-		 * name when defining [problem matchers](https://code.visualstudio.com/docs/editor/tasks#_defining-a-problem-matcher).
+		 * name when defining problem matchers.
 		 */
 		readonly name: string;
 
@@ -7299,7 +7299,7 @@ declare module 'vscode' {
 		 *
 		 * `My text $(icon-name) contains icons like $(icon-name) this one.`
 		 *
-		 * Where the icon-name is taken from the ThemeIcon [icon set](https://code.visualstudio.com/api/references/icons-in-labels#icon-listing), e.g.
+		 * Where the icon-name is taken from the ThemeIcon icon set, e.g.
 		 * `light-bulb`, `thumbsup`, `zap` etc.
 		 */
 		text: string;
@@ -7589,7 +7589,7 @@ declare module 'vscode' {
 		 *
 		 * `My text $(icon-name) contains icons like $(icon-name) this one.`
 		 *
-		 * Where the icon-name is taken from the ThemeIcon [icon set](https://code.visualstudio.com/api/references/icons-in-labels#icon-listing), e.g.
+		 * Where the icon-name is taken from the ThemeIcon icon set, e.g.
 		 * `light-bulb`, `thumbsup`, `zap` etc.
 		 */
 		text: string;
@@ -7706,7 +7706,7 @@ declare module 'vscode' {
 		readonly state: TerminalState;
 
 		/**
-		 * An object that contains [shell integration](https://code.visualstudio.com/docs/terminal/shell-integration)-powered
+		 * An object that contains shell integration-powered
 		 * features for the terminal. This will always be `undefined` immediately after the terminal
 		 * is created. Listen to {@link window.onDidChangeTerminalShellIntegration} to be notified
 		 * when shell integration is activated for a terminal.
@@ -7823,7 +7823,7 @@ declare module 'vscode' {
 	}
 
 	/**
-	 * [Shell integration](https://code.visualstudio.com/docs/terminal/shell-integration)-powered capabilities owned by a terminal.
+	 * Shell integration-powered capabilities owned by a terminal.
 	 */
 	export interface TerminalShellIntegration {
 		/**
@@ -7884,7 +7884,7 @@ declare module 'vscode' {
 		/**
 		 * Execute a command, sending ^C as necessary to interrupt any running command if needed.
 		 *
-		 * *Note* This is not guaranteed to work as [shell integration](https://code.visualstudio.com/docs/terminal/shell-integration)
+		 * *Note* This is not guaranteed to work as shell integration
 		 * must be activated. Check whether {@link TerminalShellExecution.exitCode} is rejected to
 		 * verify whether it was successful.
 		 *
@@ -9976,7 +9976,7 @@ declare module 'vscode' {
 		 * Keep in mind that even though webviews are sandboxed, they still allow running scripts and loading arbitrary content,
 		 * so extensions must follow all standard web security best practices when working with webviews. This includes
 		 * properly sanitizing all untrusted input (including content from the workspace) and
-		 * setting a [content security policy](https://aka.ms/vscode-api-webview-csp).
+		 * setting a content security policy.
 		 */
 		html: string;
 
@@ -10797,7 +10797,7 @@ declare module 'vscode' {
 		 * Portable mode is enabled when the application is run from a folder that contains
 		 * a `data` directory, allowing for self-contained installations.
 		 *
-		 * Learn more about [Portable Mode](https://code.visualstudio.com/docs/editor/portable).
+		 * Learn more about Portable Mode.
 		 */
 		export const isAppPortable: boolean;
 
@@ -10943,9 +10943,9 @@ declare module 'vscode' {
 	 * can be executed {@link commands.executeCommand manually} or from a UI gesture. Those are:
 	 *
 	 * * palette - Use the `commands`-section in `package.json` to make a command show in
-	 * the [command palette](https://code.visualstudio.com/docs/getstarted/userinterface#_command-palette).
+	 * the command palette.
 	 * * keybinding - Use the `keybindings`-section in `package.json` to enable
-	 * [keybindings](https://code.visualstudio.com/docs/getstarted/keybindings#_advanced-customization)
+	 * keybindings
 	 * for your extension.
 	 *
 	 * Commands from other extensions and from the editor itself are accessible to an extension. However,
@@ -11196,14 +11196,14 @@ declare module 'vscode' {
 
 		/**
 		 * This will be fired when a terminal command is started. This event will fire only when
-		 * [shell integration](https://code.visualstudio.com/docs/terminal/shell-integration) is
+		 * shell integration is
 		 * activated for the terminal.
 		 */
 		export const onDidStartTerminalShellExecution: Event<TerminalShellExecutionStartEvent>;
 
 		/**
 		 * This will be fired when a terminal command is ended. This event will fire only when
-		 * [shell integration](https://code.visualstudio.com/docs/terminal/shell-integration) is
+		 * shell integration is
 		 * activated for the terminal.
 		 */
 		export const onDidEndTerminalShellExecution: Event<TerminalShellExecutionEndEvent>;
@@ -12540,9 +12540,9 @@ declare module 'vscode' {
 		 * The nonce to use to verify shell integration sequences are coming from a trusted source.
 		 * An example impact of UX of this is if the command line is reported with a nonce, it will
 		 * not need to verify with the user that the command line is correct before rerunning it
-		 * via the [shell integration command decoration](https://code.visualstudio.com/docs/terminal/shell-integration#_command-decorations-and-the-overview-ruler).
+		 * via the shell integration command decoration.
 		 *
-		 * This should be used if the terminal includes [custom shell integration support](https://code.visualstudio.com/docs/terminal/shell-integration#_supported-escape-sequences).
+		 * This should be used if the terminal includes custom shell integration support.
 		 * It should be set to a random GUID which will then set the `VSCODE_NONCE` environment
 		 * variable. Inside the shell, this should then be removed from the environment so as to
 		 * protect it from general access. Once that is done it can be passed through in the
@@ -12593,9 +12593,9 @@ declare module 'vscode' {
 		 * The nonce to use to verify shell integration sequences are coming from a trusted source.
 		 * An example impact of UX of this is if the command line is reported with a nonce, it will
 		 * not need to verify with the user that the command line is correct before rerunning it
-		 * via the [shell integration command decoration](https://code.visualstudio.com/docs/terminal/shell-integration#_command-decorations-and-the-overview-ruler).
+		 * via the shell integration command decoration.
 		 *
-		 * This should be used if the terminal includes [custom shell integration support](https://code.visualstudio.com/docs/terminal/shell-integration#_supported-escape-sequences).
+		 * This should be used if the terminal includes custom shell integration support.
 		 * It should be set to a random GUID. Inside the {@link Pseudoterminal} implementation, this value
 		 * can be passed through in the relevant sequences to make them trusted.
 		 */
@@ -14694,7 +14694,7 @@ declare module 'vscode' {
 	}
 
 	/**
-	 * Namespace for participating in language-specific editor [features](https://code.visualstudio.com/docs/editor/editingevolved),
+	 * Namespace for participating in language-specific editor features,
 	 * like IntelliSense, code actions, diagnostics etc.
 	 *
 	 * Many programming languages exist and there is huge variety in syntaxes, semantics, and paradigms. Despite that, features

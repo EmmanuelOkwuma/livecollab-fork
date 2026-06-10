@@ -235,7 +235,7 @@ export interface TextSearchComplete {
 	 *
 	 * Supports links in markdown syntax:
 	 * - Click to [run a command](command:workbench.action.OpenQuickPick)
-	 * - Click to [open a website](https://aka.ms)
+	 * - Click to open a website
 	 */
 	message?: TextSearchCompleteMessage | TextSearchCompleteMessage[];
 }

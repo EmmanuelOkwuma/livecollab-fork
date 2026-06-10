@@ -1248,7 +1248,7 @@ declare namespace monaco.editor {
 		 */
 		label: string;
 		/**
-		 * Precondition rule. The value should be a [context key expression](https://code.visualstudio.com/docs/getstarted/keybindings#_when-clause-contexts).
+		 * Precondition rule. The value should be a context key expression.
 		 */
 		precondition?: string;
 		/**
@@ -6912,7 +6912,7 @@ declare namespace monaco.languages {
 
 	/**
 	 * The code action interface defines the contract between extensions and
-	 * the [light bulb](https://code.visualstudio.com/docs/editor/editingevolved#_code-action) feature.
+	 * the light bulb feature.
 	 */
 	export interface CodeActionProvider {
 		/**
@@ -7241,7 +7241,7 @@ declare namespace monaco.languages {
 
 	/**
 	 * The hover provider interface defines the contract between extensions and
-	 * the [hover](https://code.visualstudio.com/docs/editor/intellisense)-feature.
+	 * the hover-feature.
 	 */
 	export interface HoverProvider<THover = Hover> {
 		/**
@@ -7479,7 +7479,7 @@ declare namespace monaco.languages {
 
 	/**
 	 * The completion item provider interface defines the contract between extensions and
-	 * the [IntelliSense](https://code.visualstudio.com/docs/editor/intellisense).
+	 * the IntelliSense.
 	 *
 	 * When computing *complete* completion items is expensive, providers can optionally implement
 	 * the `resolveCompletionItem`-function. In that case it is enough to return completion
@@ -7901,7 +7901,7 @@ declare namespace monaco.languages {
 
 	/**
 	 * The signature help provider interface defines the contract between extensions and
-	 * the [parameter hints](https://code.visualstudio.com/docs/editor/intellisense)-feature.
+	 * the parameter hints-feature.
 	 */
 	export interface SignatureHelpProvider {
 		readonly signatureHelpTriggerCharacters?: ReadonlyArray<string>;
@@ -8033,7 +8033,7 @@ declare namespace monaco.languages {
 
 	/**
 	 * The reference provider interface defines the contract between extensions and
-	 * the [find references](https://code.visualstudio.com/docs/editor/editingevolved#_peek)-feature.
+	 * the find references-feature.
 	 */
 	export interface ReferenceProvider {
 		/**
@@ -8081,7 +8081,7 @@ declare namespace monaco.languages {
 
 	/**
 	 * The definition provider interface defines the contract between extensions and
-	 * the [go to definition](https://code.visualstudio.com/docs/editor/editingevolved#_go-to-definition)
+	 * the go to definition
 	 * and peek definition features.
 	 */
 	export interface DefinitionProvider {
@@ -8093,7 +8093,7 @@ declare namespace monaco.languages {
 
 	/**
 	 * The definition provider interface defines the contract between extensions and
-	 * the [go to definition](https://code.visualstudio.com/docs/editor/editingevolved#_go-to-definition)
+	 * the go to definition
 	 * and peek definition features.
 	 */
 	export interface DeclarationProvider {
@@ -8174,7 +8174,7 @@ declare namespace monaco.languages {
 
 	/**
 	 * The document symbol provider interface defines the contract between extensions and
-	 * the [go to symbol](https://code.visualstudio.com/docs/editor/editingevolved#_go-to-symbol)-feature.
+	 * the go to symbol-feature.
 	 */
 	export interface DocumentSymbolProvider {
 		displayName?: string;

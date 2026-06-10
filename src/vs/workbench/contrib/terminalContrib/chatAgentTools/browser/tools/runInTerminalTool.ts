@@ -2270,7 +2270,7 @@ export class RunInTerminalTool extends Disposable implements IToolImpl {
 		this._terminalToolCreator.refreshShellIntegrationQuality(toolTerminal);
 		this._logService.info(`RunInTerminalTool: shellIntegrationQuality=${toolTerminal.shellIntegrationQuality} at banner decision time`);
 		if (!toolResultMessage && toolTerminal.shellIntegrationQuality === ShellIntegrationQuality.None) {
-			toolResultMessage = '$(info) Enable [shell integration](https://code.visualstudio.com/docs/terminal/shell-integration) to improve command detection';
+			toolResultMessage = '$(info) Enable shell integration to improve command detection';
 		}
 
 		const resultText: string[] = [];

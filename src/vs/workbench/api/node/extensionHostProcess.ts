@@ -84,7 +84,7 @@ const args = minimist(process.argv.slice(2), {
 
 	Module._load = function (request: string) {
 		if (request === 'natives') {
-			throw new Error('Either the extension or an NPM dependency is using the [unsupported "natives" node module](https://go.microsoft.com/fwlink/?linkid=871887).');
+			throw new Error('Either the extension or an NPM dependency is using the unsupported "natives" node module.');
 		}
 
 		return originalLoad.apply(this, arguments);
