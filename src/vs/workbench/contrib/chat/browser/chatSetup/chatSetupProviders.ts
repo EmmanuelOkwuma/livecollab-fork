@@ -256,6 +256,15 @@ export class SetupAgent extends Disposable implements IChatAgentImplementation {
 	}
 
 	private async doInvoke(request: IChatAgentRequest, progress: (part: IChatProgress) => void, chatService: IChatService, languageModelsService: ILanguageModelsService, chatWidgetService: IChatWidgetService, chatAgentService: IChatAgentService, languageModelToolsService: ILanguageModelToolsService, defaultAccountService: IDefaultAccountService): Promise<IChatAgentResult> {
+		// LiveCollab: intercept send — show coming soon message instead of Copilot setup modal
+		const _livecollabComingSoon = true;
+		if (_livecollabComingSoon) {
+			progress({
+				kind: 'markdownContent',
+				content: new MarkdownString(localize('livecollabComingSoon', "LiveCollab AI is coming soon. You'll be able to chat with your codebase right here. In the meantime, you can install an AI extension from the marketplace.")),
+			});
+			return {};
+		}
 		const hasByokModels = this.chatEntitlementService.hasByokModels;
 		if (
 			(!this.context.state.completed && !hasByokModels) ||				// Setup not completed (unless BYOK models are available)
