@@ -864,7 +864,7 @@ export class AgentTitleBarStatusWidget extends BaseActionViewItem {
 
 		const primaryActionId = TOGGLE_CHAT_ACTION_ID;
 		const primaryActionTitle = localize('toggleChat', "Toggle Chat");
-		const primaryActionIcon = Codicon.chatSparkle;
+		const primaryActionIcon = Codicon.hubot; // LiveCollab: was chatSparkle
 
 		// Create primary action
 		const primaryAction = this.instantiationService.createInstance(MenuItemAction, {
