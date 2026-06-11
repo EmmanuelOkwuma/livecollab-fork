@@ -1230,7 +1230,7 @@ export class ChatWidget extends Disposable implements IChatWidget {
 		return {
 			title,
 			message: new MarkdownString(DISCLAIMER),
-			icon: Codicon.chatSparkle,
+			icon: Codicon.hubot, // LiveCollab: was chatSparkle
 			additionalMessage,
 		};
 	}
