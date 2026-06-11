@@ -1144,8 +1144,8 @@
 	content: ' ';
 	font-size: 0 !important;
 	display: inline-block;
-	width: 22px;
-	height: 22px;
+	width: 24px;
+	height: 24px;
 	background-image: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><circle cx="34" cy="24" r="11" fill="%232563EB"/><rect x="28.5" y="24" width="11" height="50" rx="5.5" fill="%232563EB"/><circle cx="62" cy="38" r="8.5" fill="%2360A5FA"/><rect x="57.75" y="38" width="8.5" height="36" rx="4.25" fill="%2360A5FA"/></svg>');
 	background-size: contain;
 	background-repeat: no-repeat;
