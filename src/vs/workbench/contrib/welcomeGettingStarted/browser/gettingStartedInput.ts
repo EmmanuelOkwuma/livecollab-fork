@@ -10,6 +10,12 @@ import { URI } from '../../../../base/common/uri.js';
 import { Schemas } from '../../../../base/common/network.js';
 import { IUntypedEditorInput } from '../../../common/editor.js';
 import { IEditorOptions } from '../../../../platform/editor/common/editor.js';
+import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
+import { Codicon } from '../../../../base/common/codicons.js';
+import { ThemeIcon } from '../../../../base/common/themables.js';
+
+// LiveCollab: welcome tab brand icon (CSS in gettingStarted.css paints the actual mark)
+const livecollabWelcomeIcon = registerIcon('livecollab-welcome', Codicon.symbolEvent, localize('livecollabWelcomeIcon', 'Icon for the LiveCollab Welcome tab.'));
 
 export const gettingStartedInputTypeId = 'workbench.editors.gettingStartedInput';
 
@@ -38,6 +44,10 @@ export class GettingStartedInput extends EditorInput {
 
 	override get typeId(): string {
 		return GettingStartedInput.ID;
+	}
+
+	override getIcon(): ThemeIcon {
+		return livecollabWelcomeIcon;
 	}
 
 	override get editorId(): string | undefined {
