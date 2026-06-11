@@ -879,6 +879,7 @@ export class AICustomizationManagementEditor extends EditorPane {
 			const modelsLink = DOM.append(this.modelsFooterElement, $('a.section-footer-link')) as HTMLAnchorElement;
 			modelsLink.textContent = localize('learnMoreModels', "Learn more about language models");
 			modelsLink.href = '';
+			modelsLink.style.display = 'none'; // LiveCollab: hide until our docs exist
 			this.editorDisposables.add(DOM.addDisposableListener(modelsLink, 'click', (e) => {
 				e.preventDefault();
 				this.openerService.open(URI.parse(modelsLink.href));

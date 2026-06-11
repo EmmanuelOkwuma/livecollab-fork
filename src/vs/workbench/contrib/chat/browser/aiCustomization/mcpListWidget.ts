@@ -430,6 +430,7 @@ export class McpListWidget extends Disposable {
 		this.sectionLink = DOM.append(sectionTitleDescription, $('a.section-title-link')) as HTMLAnchorElement;
 		this.sectionLink.textContent = localize('learnMoreMcp', "Learn more about MCP servers");
 		this.sectionLink.href = '';
+		this.sectionLink.style.display = 'none'; // LiveCollab: hide until our docs exist
 		this._register(DOM.addDisposableListener(this.sectionLink, 'click', (e) => {
 			e.preventDefault();
 			const href = this.sectionLink.href;

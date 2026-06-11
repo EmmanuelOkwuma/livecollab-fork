@@ -504,6 +504,7 @@ export class PluginListWidget extends Disposable {
 		this.sectionLink = DOM.append(sectionTitleDescription, $('a.section-title-link')) as HTMLAnchorElement;
 		this.sectionLink.textContent = localize('learnMorePlugins', "Learn more about agent plugins");
 		this.sectionLink.href = '';
+		this.sectionLink.style.display = 'none'; // LiveCollab: hide until our docs exist
 		this._register(DOM.addDisposableListener(this.sectionLink, 'click', (e) => {
 			e.preventDefault();
 			const href = this.sectionLink.href;

@@ -88,7 +88,7 @@ import { getSandboxPrecheckInputsForToolInvocation } from '../../../../chat/brow
 
 // #region Tool data
 
-const TERMINAL_SANDBOX_DOCUMENTATION_URL = 'https://aka.ms/vscode-sandboxing';
+const TERMINAL_SANDBOX_DOCUMENTATION_URL = '';
 const TOOL_REFERENCE_NAME = 'runInTerminal';
 const LEGACY_TOOL_REFERENCE_FULL_NAMES = ['runCommands/runInTerminal'];
 const INPUT_NEEDED_NOTIFICATION_THROTTLE_MS = 5000;

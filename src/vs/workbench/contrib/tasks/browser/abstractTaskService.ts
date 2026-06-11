@@ -1376,7 +1376,7 @@ export abstract class AbstractTaskService extends Disposable implements ITaskSer
 	}
 
 	private _openDocumentation(): void {
-		this._openerService.open(URI.parse('https://code.visualstudio.com/docs/editor/tasks#_defining-a-problem-matcher'));
+		this._openerService.open(URI.parse(''));
 	}
 
 	private async _findSingleWorkspaceTaskOfGroup(group: TaskGroup): Promise<ITaskSummary | undefined> {

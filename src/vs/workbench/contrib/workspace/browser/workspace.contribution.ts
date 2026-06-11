@@ -573,7 +573,7 @@ export class WorkspaceTrustUXHandler extends Disposable implements IWorkbenchCon
 				},
 				{
 					label: localize('restrictedModeBannerLearnMore', "Learn More"),
-					href: 'https://aka.ms/vscode-workspace-trust'
+					href: ''
 				}
 			];
 

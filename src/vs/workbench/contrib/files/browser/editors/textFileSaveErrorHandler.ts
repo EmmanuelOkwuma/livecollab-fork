@@ -213,7 +213,7 @@ class ResolveConflictLearnMoreAction extends Action {
 	}
 
 	override async run(): Promise<void> {
-		await this.openerService.open(URI.parse('https://go.microsoft.com/fwlink/?linkid=868264'));
+		await this.openerService.open(URI.parse(''));
 	}
 }
 

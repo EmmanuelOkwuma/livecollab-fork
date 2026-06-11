@@ -68,7 +68,7 @@ export class BrowserClipboardService extends BaseBrowserClipboardService {
 						}
 					}, {
 						label: localize('learnMore', "Learn More"),
-						run: () => this.openerService.open('https://go.microsoft.com/fwlink/?linkid=2151362')
+						run: () => this.openerService.open('')
 					}],
 					{
 						sticky: true
