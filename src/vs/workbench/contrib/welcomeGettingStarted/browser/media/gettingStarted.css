@@ -1139,18 +1139,13 @@
 	border-color: var(--vscode-checkbox-border) !important;
 }
 
-
-/* LiveCollab: welcome tab shows the brand mark instead of a glyph */
+/* LiveCollab: welcome tab brand mark */
 .codicon-livecollab-welcome {
-	width: 16px !important;
-	height: 16px !important;
-	display: inline-block !important;
-	vertical-align: text-bottom;
+	width: 20px;
+	height: 20px;
 	background-image: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><circle cx="34" cy="24" r="11" fill="%232563EB"/><rect x="28.5" y="24" width="11" height="50" rx="5.5" fill="%232563EB"/><circle cx="62" cy="38" r="8.5" fill="%2360A5FA"/><rect x="57.75" y="38" width="8.5" height="36" rx="4.25" fill="%2360A5FA"/></svg>');
 	background-size: contain;
 	background-repeat: no-repeat;
 	background-position: center;
-}
-.codicon-livecollab-welcome::before {
-	content: '' !important;
+	color: transparent !important;
 }
