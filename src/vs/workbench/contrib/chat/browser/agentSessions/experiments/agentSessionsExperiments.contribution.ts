@@ -251,11 +251,10 @@ registerWorkbenchContribution2(AgentTitleBarStatusRendering.ID, AgentTitleBarSta
 registerWorkbenchContribution2(AgentSessionReadyContribution.ID, AgentSessionReadyContribution, WorkbenchPhase.AfterRestored);
 
 // Register Agent Status as a menu item in the command center (alongside the search box, not replacing it)
-MenuRegistry.appendMenuItem(MenuId.TitleBar, {
+MenuRegistry.appendMenuItem(MenuId.CommandCenter, {
 	submenu: MenuId.AgentsTitleBarControlMenu,
 	title: localize('agentsControl', "Agents"),
-	group: 'navigation',
-	icon: Codicon.hubot, // LiveCollab: standalone on title bar, was chatSparkle in command center
+	icon: Codicon.chatSparkle,
 	when: ContextKeyExpr.and(
 		ChatContextKeys.enabled,
 		ContextKeyExpr.notEquals(`config.${ChatConfiguration.AgentStatusEnabled}`, 'hidden'),
@@ -270,7 +269,7 @@ MenuRegistry.appendMenuItem(MenuId.TitleBar, {
 	submenu: MenuId.ChatTitleBarMenu,
 	title: localize('title4', "Chat"),
 	group: 'navigation',
-	icon: Codicon.hubot, // LiveCollab: was chatSparkle
+	icon: Codicon.chatSparkle,
 	when: ContextKeyExpr.and(
 		ChatContextKeys.supported,
 		ContextKeyExpr.and(
