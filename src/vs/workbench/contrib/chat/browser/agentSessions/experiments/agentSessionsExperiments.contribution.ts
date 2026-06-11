@@ -254,7 +254,7 @@ registerWorkbenchContribution2(AgentSessionReadyContribution.ID, AgentSessionRea
 MenuRegistry.appendMenuItem(MenuId.CommandCenter, {
 	submenu: MenuId.AgentsTitleBarControlMenu,
 	title: localize('agentsControl', "Agents"),
-	icon: Codicon.chatSparkle,
+	icon: Codicon.hubot, // LiveCollab: was chatSparkle
 	when: ContextKeyExpr.and(
 		ChatContextKeys.enabled,
 		ContextKeyExpr.notEquals(`config.${ChatConfiguration.AgentStatusEnabled}`, 'hidden'),
@@ -269,7 +269,7 @@ MenuRegistry.appendMenuItem(MenuId.TitleBar, {
 	submenu: MenuId.ChatTitleBarMenu,
 	title: localize('title4', "Chat"),
 	group: 'navigation',
-	icon: Codicon.chatSparkle,
+	icon: Codicon.hubot, // LiveCollab: was chatSparkle
 	when: ContextKeyExpr.and(
 		ChatContextKeys.supported,
 		ContextKeyExpr.and(
