@@ -10,6 +10,9 @@ import { IStorageService } from '../../../../platform/storage/common/storage.js'
 import { IEditorGroup } from '../../../services/editor/common/editorGroupsService.js';
 import { Dimension } from '../../../../base/browser/dom.js';
 import { livecollabService } from './livecollabService.js';
+import { LiveCollabRoomHomeInput } from './livecollabRoomHomeInput.js';
+import { IEditorService } from '../../../services/editor/common/editorService.js';
+import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
 
 export class LiveCollabDashboardEditor extends EditorPane {
 
@@ -23,6 +26,8 @@ export class LiveCollabDashboardEditor extends EditorPane {
 		@ITelemetryService telemetryService: ITelemetryService,
 		@IThemeService themeService: IThemeService,
 		@IStorageService storageService: IStorageService,
+		@IEditorService private readonly editorService: IEditorService,
+		@IInstantiationService private readonly instantiationService: IInstantiationService,
 	) {
 		super(LiveCollabDashboardEditor.ID, group, telemetryService, themeService, storageService);
 	}
@@ -281,9 +286,11 @@ export class LiveCollabDashboardEditor extends EditorPane {
 
 	private _pendingSuccessRoomId: string | undefined;
 
-	private _openRoom(room: any): void {
-		livecollabService.joinExistingRoom(room.id);
-		console.log('[LiveCollab] joined room socket channel:', room.id, '\u2014 in-room experience lands with the week 2-3 rewire');
+	private async _openRoom(room: any): Promise<void> {
+		livecollabService.setRoomContext(room.name, room.accessRole);
+		await livecollabService.joinExistingRoom(room.id);
+		const input = this.instantiationService.createInstance(LiveCollabRoomHomeInput);
+		await this.editorService.openEditor(input, { pinned: true });
 	}
 	private async _deleteRoom(room: any): Promise<void> {
 		const ok = await livecollabService.deleteRoom(room.id);

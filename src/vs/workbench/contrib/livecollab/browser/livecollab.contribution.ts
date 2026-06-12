@@ -208,6 +208,15 @@ Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).regi
 	LifecyclePhase.Restored
 );
 
+// ===== LiveCollab Room Home (Phase D week 3) =====
+import { LiveCollabRoomHomeInput } from './livecollabRoomHomeInput.js';
+import { LiveCollabRoomHomeEditor } from './livecollabRoomHomeEditor.js';
+
+Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane(
+	EditorPaneDescriptor.create(LiveCollabRoomHomeEditor, LiveCollabRoomHomeEditor.ID, 'LiveCollab Room'),
+	[new SyncDescriptor(LiveCollabRoomHomeInput)]
+);
+
 // ===== LiveCollab Dashboard (Phase D week 1) =====
 import { LiveCollabDashboardInput } from './livecollabDashboardInput.js';
 import { LiveCollabDashboardEditor } from './livecollabDashboardEditor.js';
