@@ -305,16 +305,12 @@ class LiveCollabStartupOwner extends Disposable implements IWorkbenchContributio
 				await workspaceEditingService.removeFolders(ghosts.map(g => g.uri)).catch(console.error);
 			}
 
-			const roomless = workspaceContextService.getWorkbenchState() === WorkbenchState.EMPTY;
-			if (!roomless) {
-				// Folder window: full IDE, undo any persisted door state.
-				await openShell();
-				const token0 = await secretStorageService.get('livecollab.token');
-				if (token0) {
-					livecollabService.setToken(token0);
-					livecollabService.connect().catch(console.error);
-				}
-				return;
+			// THE LAW at startup: no room context exists yet on a fresh window, so restored
+			// folders have no owner — strip them. Reload lands on the dashboard, always.
+			const restored = workspaceContextService.getWorkspace().folders.map(f => f.uri);
+			if (restored.length) {
+				const workspaceEditingService = instantiationService.invokeFunction(accessor => accessor.get(IWorkspaceEditingService));
+				await workspaceEditingService.removeFolders(restored).catch(console.error);
 			}
 
 			// Roomless window: the door closes around a single page.
@@ -339,14 +335,28 @@ class LiveCollabStartupOwner extends Disposable implements IWorkbenchContributio
 			}
 		})().catch(console.error);
 
-		// A folder arriving = the workspace materializes; the shell wakes.
+		// THE LAW: a roomless window holds no folders. A folder may only live inside a room.
+		// Folder arrives + room active = the workspace materializes. Without a room = stripped, back to the dashboard.
 		this._register(workspaceContextService.onDidChangeWorkbenchState(async state => {
 			if (state !== WorkbenchState.EMPTY) {
-				await openShell();
+				if (livecollabService.roomId) {
+					await openShell();
+				} else {
+					const intruders = workspaceContextService.getWorkspace().folders.map(f => f.uri);
+					if (intruders.length) {
+						const workspaceEditingService = instantiationService.invokeFunction(accessor => accessor.get(IWorkspaceEditingService));
+						await workspaceEditingService.removeFolders(intruders).catch(console.error);
+					}
+					await closeDoors();
+					const dash = instantiationService.createInstance(LiveCollabDashboardInput);
+					await editorService.openEditor(dash, { pinned: true });
+				}
 			} else {
-				await closeDoors();
-				const dash = instantiationService.createInstance(LiveCollabDashboardInput);
-				await editorService.openEditor(dash, { pinned: true });
+				if (!livecollabService.roomId) {
+					await closeDoors();
+					const dash = instantiationService.createInstance(LiveCollabDashboardInput);
+					await editorService.openEditor(dash, { pinned: true });
+				}
 			}
 		}));
 	}
