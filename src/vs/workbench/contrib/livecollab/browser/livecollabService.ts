@@ -75,6 +75,12 @@ export class LiveCollabService extends Disposable {
 	get isConnected(): boolean { return this.socket?.connected ?? false; }
 	get roomId(): string | undefined { return this._roomId; }
 	get roomName(): string | undefined { return this._roomName; }
+	private _myRole: string | undefined;
+	get myRole(): string | undefined { return this._myRole; }
+	setRoomContext(name: string | undefined, role: string | undefined): void {
+		this._roomName = name;
+		this._myRole = role;
+	}
 	get token(): string | undefined { return this._token; }
 	get lastMembers(): ILiveCollabMember[] { return this._lastMembers; }
 
