@@ -212,6 +212,7 @@ Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).regi
 import { LiveCollabDashboardInput } from './livecollabDashboardInput.js';
 import { LiveCollabDashboardEditor } from './livecollabDashboardEditor.js';
 import { IWorkspaceContextService, WorkbenchState } from '../../../../platform/workspace/common/workspace.js';
+import { MenuRegistry, MenuId } from '../../../../platform/actions/common/actions.js';
 
 Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane(
 	EditorPaneDescriptor.create(LiveCollabDashboardEditor, LiveCollabDashboardEditor.ID, 'LiveCollab Dashboard'),
@@ -223,6 +224,12 @@ CommandsRegistry.registerCommand('livecollab.openDashboard', async (accessor) =>
 	const instantiationService = accessor.get(IInstantiationService);
 	const input = instantiationService.createInstance(LiveCollabDashboardInput);
 	await editorService.openEditor(input, { pinned: true });
+});
+MenuRegistry.appendMenuItem(MenuId.CommandPalette, {
+	command: {
+		id: 'livecollab.openDashboard',
+		title: { value: 'LiveCollab: Open Dashboard', original: 'LiveCollab: Open Dashboard' },
+	}
 });
 
 class LiveCollabDashboardContribution extends Disposable implements IWorkbenchContribution {
