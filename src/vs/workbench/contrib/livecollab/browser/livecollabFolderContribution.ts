@@ -25,10 +25,10 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 	) {
 		super();
 
-		// When socket connects — register current folder as room
+		// When socket connects — attach current folder content to active room (if any)
 		this._register(livecollabService.onConnected(() => {
 			console.log('[LiveCollab] socket connected — checking folder');
-			this._registerFolderAsRoom();
+			this._attachFolderToRoom();
 		}));
 
 		// Register livecollab:// file system provider
@@ -74,7 +74,7 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 		// When folder changes while already connected — register new folder
 		this._register(this.workspaceContextService.onDidChangeWorkspaceFolders(() => {
 			if (livecollabService.isConnected) {
-				this._registerFolderAsRoom();
+				this._attachFolderToRoom();
 			}
 		}));
 
@@ -91,7 +91,9 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 		}
 	}
 
-	private async _registerFolderAsRoom(): Promise<void> {
+	private async _attachFolderToRoom(): Promise<void> {
+		// lc/1: rooms are born on the dashboard. A folder NEVER creates a room —
+		// it only attaches content to the room you are already in.
 		const folders = this.workspaceContextService.getWorkspace().folders;
 		if (!folders || folders.length === 0) {
 			// No folder open — clear file state only, room and members stay
@@ -99,26 +101,20 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 			return;
 		}
 
-		// Skip if this is a virtual livecollab:// folder — guest already in a room
+		// Virtual livecollab:// folder — guest viewing a broadcast, nothing to attach
 		if (folders.some(f => f.uri.scheme === LIVECOLLAB_SCHEME)) {
-			console.log('[LiveCollab] virtual folder detected — skipping room creation');
+			console.log('[LiveCollab] virtual folder detected — content attach not applicable');
+			return;
+		}
+
+		const roomId = livecollabService.roomId;
+		if (!roomId) {
+			console.log('[LiveCollab] folder open with no active room — not attaching (rooms are born on the dashboard)');
 			return;
 		}
 
 		const folder = folders[0];
-		const folderPath = folder.uri.fsPath;
-		const folderName = folder.name;
-
-		const existingRoomId = livecollabService.getRoomIdForFolder(folderPath);
-		if (existingRoomId) {
-			console.log('[LiveCollab] folder already registered as room:', existingRoomId);
-			await livecollabService.joinExistingRoom(existingRoomId);
-			return;
-		}
-
-		console.log('[LiveCollab] registering folder as room:', folderName);
-		await livecollabService.createRoom(folderName, folderPath);
-		// After room is created, broadcast file tree to all members
+		console.log('[LiveCollab] attaching folder content to room:', roomId);
 		await this._broadcastFileTree(folder.uri);
 	}
 

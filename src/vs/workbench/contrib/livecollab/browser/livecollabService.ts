@@ -32,7 +32,6 @@ export class LiveCollabService extends Disposable {
 	private _roomId: string | undefined;
 	private _roomName: string | undefined;
 	private _displayName: string = 'User';
-	private _folderRoomCache: Map<string, string> = new Map();
 	private _lastMembers: ILiveCollabMember[] = [];
 	private _fileCache: Map<string, string> = new Map();
 	private _connecting = false;
@@ -146,20 +145,6 @@ export class LiveCollabService extends Disposable {
 		this.socket.on('chat:message', (msg: ILiveCollabMessage) => { this._onMessageReceived.fire(msg); });
 	}
 
-	async createRoom(folderName: string, folderPath: string): Promise<void> {
-		if (!this.socket?.connected) { return; }
-		return new Promise((resolve) => {
-			this.socket.emit('room:create', { name: folderName }, (res: any) => {
-				if (res?.roomId) {
-					this._roomId = res.roomId;
-					this._roomName = folderName;
-					this._folderRoomCache.set(folderPath, res.roomId);
-					console.log('[LiveCollab] room created:', res.roomId);
-				}
-				resolve();
-			});
-		});
-	}
 
 	async joinExistingRoom(roomId: string): Promise<void> {
 		if (!this.socket?.connected) { return; }
@@ -169,7 +154,6 @@ export class LiveCollabService extends Disposable {
 		});
 	}
 
-	getRoomIdForFolder(folderPath: string): string | undefined { return this._folderRoomCache.get(folderPath); }
 
 	// ===== LiveCollab Dashboard verbs (Phase D week 1) =====
 	async listMyRooms(): Promise<any[]> {
