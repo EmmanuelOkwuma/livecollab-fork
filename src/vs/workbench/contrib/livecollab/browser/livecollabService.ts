@@ -171,6 +171,40 @@ export class LiveCollabService extends Disposable {
 
 	getRoomIdForFolder(folderPath: string): string | undefined { return this._folderRoomCache.get(folderPath); }
 
+	// ===== LiveCollab Dashboard verbs (Phase D week 1) =====
+	async listMyRooms(): Promise<any[]> {
+		if (!this.socket?.connected) { return []; }
+		return new Promise((resolve) => {
+			this.socket.emit('rooms:list', {}, (res: any) => {
+				resolve(Array.isArray(res?.rooms) ? res.rooms : []);
+			});
+		});
+	}
+	async createRoomNamed(name: string): Promise<string | undefined> {
+		if (!this.socket?.connected) { return undefined; }
+		return new Promise((resolve) => {
+			this.socket.emit('room:create', { name }, (res: any) => {
+				resolve(res?.roomId);
+			});
+		});
+	}
+	async deleteRoom(roomId: string): Promise<boolean> {
+		if (!this.socket?.connected) { return false; }
+		return new Promise((resolve) => {
+			this.socket.emit('room:delete', { roomId }, (res: any) => {
+				resolve(!!res?.ok);
+			});
+		});
+	}
+	async joinByCode(code: string): Promise<{ ok: boolean; roomId?: string; error?: string }> {
+		if (!this.socket?.connected) { return { ok: false, error: 'not_connected' }; }
+		return new Promise((resolve) => {
+			this.socket.emit('room:invite:accept', { code }, (res: any) => {
+				resolve({ ok: !!res?.ok, roomId: res?.roomId, error: res?.error });
+			});
+		});
+	}
+
 	clearRoom(): void {
 		this._roomId = undefined;
 		this._roomName = undefined;
