@@ -133,6 +133,19 @@ export class LiveCollabDashboardEditor extends EditorPane {
 		for (const room of rooms) {
 			this._renderRoomCard(room);
 		}
+		if (this._pendingSuccessRoomId) {
+			const target = this._pendingSuccessRoomId;
+			this._pendingSuccessRoomId = undefined;
+			const cards = this._roomsGrid.querySelectorAll('.lc-dash-card');
+			cards.forEach((el) => {
+				const card = el as HTMLElement;
+				if (card.dataset.roomId === target) {
+					card.style.borderColor = '#007ACC';
+					card.style.boxShadow = '0 0 0 1px #007ACC';
+					setTimeout(() => { card.style.borderColor = ''; card.style.boxShadow = ''; }, 1800);
+				}
+			});
+		}
 	}
 
 	private _renderRoomCard(room: any): void {
@@ -141,6 +154,7 @@ export class LiveCollabDashboardEditor extends EditorPane {
 		const isOwner = room.accessRole === 'owner';
 
 		const card = append(this._roomsGrid, $('div.lc-dash-card'));
+		card.dataset.roomId = room.id;
 		card.style.cssText = `
 			border: 1px solid var(--vscode-panel-border, #2B2B2B);
 			border-radius: 8px;
@@ -191,10 +205,86 @@ export class LiveCollabDashboardEditor extends EditorPane {
 		}
 	}
 
-	// ===== Stage 2 flows (stubs for now) =====
-	private _showCreateFlow(): void { console.log('[LiveCollab] create flow - stage 2'); }
-	private _showJoinFlow(): void { console.log('[LiveCollab] join flow - stage 2'); }
-	private _openRoom(room: any): void { console.log('[LiveCollab] open room - stage 2:', room.id); }
+	// ===== Create / Join flows =====
+	private _flowSlot(): HTMLElement | undefined {
+		return this._container?.querySelector('.lc-dash-flow') as HTMLElement | undefined;
+	}
+
+	private _showCreateFlow(): void {
+		const slot = this._flowSlot();
+		if (!slot) { return; }
+		clearNode(slot);
+		const form = append(slot, $('div'));
+		form.style.cssText = `display: flex; gap: 8px; align-items: center; border: 1px solid #007ACC; border-radius: 6px; padding: 12px 16px; background: #181818;`;
+		const input = append(form, $('input')) as HTMLInputElement;
+		input.placeholder = 'Room name\u2026';
+		input.style.cssText = `flex: 1; background: #1E1E1E; border: 1px solid var(--vscode-panel-border, #2B2B2B); border-radius: 4px; padding: 8px 10px; color: #FAFCFF; font-size: 13px; font-family: inherit; outline: none;`;
+		const go = append(form, $('button'));
+		go.textContent = 'Create';
+		go.style.cssText = this._buttonCss(true);
+		const cancel = append(form, $('button'));
+		cancel.textContent = 'Cancel';
+		cancel.style.cssText = this._buttonCss(false);
+		cancel.onclick = () => clearNode(slot);
+		const submit = async () => {
+			const name = input.value.trim();
+			if (!name) { input.focus(); return; }
+			go.textContent = 'Creating\u2026';
+			const roomId = await livecollabService.createRoomNamed(name);
+			clearNode(slot);
+			if (roomId) {
+				this._pendingSuccessRoomId = roomId;
+				this._loadRooms();
+			}
+		};
+		go.onclick = submit;
+		input.onkeydown = (e) => { if (e.key === 'Enter') { submit(); } };
+		input.focus();
+	}
+
+	private _showJoinFlow(): void {
+		const slot = this._flowSlot();
+		if (!slot) { return; }
+		clearNode(slot);
+		const form = append(slot, $('div'));
+		form.style.cssText = `display: flex; gap: 8px; align-items: center; border: 1px solid var(--vscode-panel-border, #2B2B2B); border-radius: 6px; padding: 12px 16px; background: #181818;`;
+		const input = append(form, $('input')) as HTMLInputElement;
+		input.placeholder = 'Paste invite code\u2026';
+		input.style.cssText = `flex: 1; background: #1E1E1E; border: 1px solid var(--vscode-panel-border, #2B2B2B); border-radius: 4px; padding: 8px 10px; color: #FAFCFF; font-size: 13px; font-family: inherit; outline: none;`;
+		const status = append(form, $('div'));
+		status.style.cssText = `font-size: 12px; color: #A0A8B0;`;
+		const go = append(form, $('button'));
+		go.textContent = 'Join';
+		go.style.cssText = this._buttonCss(true);
+		const cancel = append(form, $('button'));
+		cancel.textContent = 'Cancel';
+		cancel.style.cssText = this._buttonCss(false);
+		cancel.onclick = () => clearNode(slot);
+		const submit = async () => {
+			const code = input.value.trim();
+			if (!code) { input.focus(); return; }
+			go.textContent = 'Joining\u2026';
+			const res = await livecollabService.joinByCode(code);
+			if (res.ok) {
+				clearNode(slot);
+				if (res.roomId) { this._pendingSuccessRoomId = res.roomId; }
+				this._loadRooms();
+			} else {
+				go.textContent = 'Join';
+				status.textContent = res.error === 'invalid_code' ? 'That code didn\u2019t work \u2014 check it and try again.' : 'Couldn\u2019t join \u2014 try again.';
+			}
+		};
+		go.onclick = submit;
+		input.onkeydown = (e) => { if (e.key === 'Enter') { submit(); } };
+		input.focus();
+	}
+
+	private _pendingSuccessRoomId: string | undefined;
+
+	private _openRoom(room: any): void {
+		livecollabService.joinExistingRoom(room.id);
+		console.log('[LiveCollab] joined room socket channel:', room.id, '\u2014 in-room experience lands with the week 2-3 rewire');
+	}
 	private async _deleteRoom(room: any): Promise<void> {
 		const ok = await livecollabService.deleteRoom(room.id);
 		if (ok) { this._loadRooms(); }
