@@ -6,7 +6,6 @@
 import { Disposable } from '../../../../base/common/lifecycle.js';
 import { IWorkbenchContribution } from '../../../common/contributions.js';
 import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
-import { ISecretStorageService } from '../../../../platform/secrets/common/secrets.js';
 import { livecollabService } from './livecollabService.js';
 import { livecollabFileSystemProvider, LIVECOLLAB_SCHEME } from './livecollabFileSystemProvider.js';
 import { IWorkspaceEditingService } from '../../../services/workspaces/common/workspaceEditing.js';
@@ -19,7 +18,6 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 
 	constructor(
 		@IWorkspaceContextService private readonly workspaceContextService: IWorkspaceContextService,
-		@ISecretStorageService private readonly secretStorageService: ISecretStorageService,
 		@IFileService private readonly fileService: IFileService,
 		@IWorkspaceEditingService private readonly workspaceEditingService: IWorkspaceEditingService,
 	) {
@@ -78,18 +76,9 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 			}
 		}));
 
-		// On startup — load token and connect (this triggers onConnected above)
-		this._initWithToken();
+		// lc/1: startup is owned by LiveCollabStartupOwner — this contribution only listens
 	}
 
-	private async _initWithToken(): Promise<void> {
-		const token = await this.secretStorageService.get('livecollab.token');
-		console.log('[LiveCollab] _initWithToken token found:', !!token);
-		if (token) {
-			livecollabService.setToken(token);
-			await livecollabService.connect();
-		}
-	}
 
 	private async _attachFolderToRoom(): Promise<void> {
 		// lc/1: rooms are born on the dashboard. A folder NEVER creates a room —

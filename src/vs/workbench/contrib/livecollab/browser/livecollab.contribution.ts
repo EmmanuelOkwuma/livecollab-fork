@@ -168,7 +168,6 @@ class LiveCollabSignInEditorResolver extends Disposable implements IWorkbenchCon
 	constructor(
 		@IEditorResolverService editorResolverService: IEditorResolverService,
 		@IInstantiationService private readonly instantiationService: IInstantiationService,
-		@ISecretStorageService private readonly secretStorageService: ISecretStorageService,
 
 	) {
 		super();
@@ -188,13 +187,6 @@ class LiveCollabSignInEditorResolver extends Disposable implements IWorkbenchCon
 			}
 		));
 
-		// Check for stored token on startup
-		this.secretStorageService.get('livecollab.token').then(token => {
-			if (token) {
-				livecollabService.setToken(token);
-				livecollabService.connect().catch(console.error);
-			}
-		});
 	}
 }
 
@@ -246,9 +238,6 @@ class LiveCollabDashboardContribution extends Disposable implements IWorkbenchCo
 	constructor(
 		@IEditorResolverService editorResolverService: IEditorResolverService,
 		@IInstantiationService private readonly instantiationService: IInstantiationService,
-		@ISecretStorageService private readonly secretStorageService: ISecretStorageService,
-		@IEditorService private readonly editorService: IEditorService,
-		@IWorkspaceContextService private readonly workspaceContextService: IWorkspaceContextService,
 	) {
 		super();
 		this._register(editorResolverService.registerEditor(
@@ -266,16 +255,42 @@ class LiveCollabDashboardContribution extends Disposable implements IWorkbenchCo
 				})
 			}
 		));
-		// Whole-window-first: signed in + no folder open -> dashboard is the front door
-		this.secretStorageService.get('livecollab.token').then(token => {
-			if (token && this.workspaceContextService.getWorkbenchState() === WorkbenchState.EMPTY) {
-				const input = this.instantiationService.createInstance(LiveCollabDashboardInput);
-				this.editorService.openEditor(input, { pinned: true }).catch(console.error);
-			}
-		});
 	}
 }
 Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).registerWorkbenchContribution(
 	LiveCollabDashboardContribution,
+	LifecyclePhase.Restored
+);
+
+// ===== LiveCollab Startup Owner — the ONE startup brain (Page Law, council r3+r4) =====
+class LiveCollabStartupOwner extends Disposable implements IWorkbenchContribution {
+	static readonly ID = 'workbench.contrib.livecollabStartupOwner';
+	constructor(
+		@ISecretStorageService secretStorageService: ISecretStorageService,
+		@IInstantiationService instantiationService: IInstantiationService,
+		@IEditorService editorService: IEditorService,
+		@IWorkspaceContextService workspaceContextService: IWorkspaceContextService,
+	) {
+		super();
+		(async () => {
+			const token = await secretStorageService.get('livecollab.token');
+			if (!token) {
+				// Door 1: signed out — sign-in IS the window
+				const signIn = instantiationService.createInstance(LiveCollabSignInInput);
+				await editorService.openEditor(signIn, { pinned: true });
+				return;
+			}
+			// Door 2: signed in — connect ONCE, dashboard is the resting state
+			livecollabService.setToken(token);
+			livecollabService.connect().catch(console.error);
+			if (workspaceContextService.getWorkbenchState() === WorkbenchState.EMPTY) {
+				const dash = instantiationService.createInstance(LiveCollabDashboardInput);
+				await editorService.openEditor(dash, { pinned: true });
+			}
+		})().catch(console.error);
+	}
+}
+Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).registerWorkbenchContribution(
+	LiveCollabStartupOwner,
 	LifecyclePhase.Restored
 );
