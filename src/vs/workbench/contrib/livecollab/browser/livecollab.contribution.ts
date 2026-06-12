@@ -207,3 +207,59 @@ Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).regi
 	LiveCollabFolderContribution,
 	LifecyclePhase.Restored
 );
+
+// ===== LiveCollab Dashboard (Phase D week 1) =====
+import { LiveCollabDashboardInput } from './livecollabDashboardInput.js';
+import { LiveCollabDashboardEditor } from './livecollabDashboardEditor.js';
+import { IWorkspaceContextService, WorkbenchState } from '../../../../platform/workspace/common/workspace.js';
+
+Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane(
+	EditorPaneDescriptor.create(LiveCollabDashboardEditor, LiveCollabDashboardEditor.ID, 'LiveCollab Dashboard'),
+	[new SyncDescriptor(LiveCollabDashboardInput)]
+);
+
+CommandsRegistry.registerCommand('livecollab.openDashboard', async (accessor) => {
+	const editorService = accessor.get(IEditorService);
+	const instantiationService = accessor.get(IInstantiationService);
+	const input = instantiationService.createInstance(LiveCollabDashboardInput);
+	await editorService.openEditor(input, { pinned: true });
+});
+
+class LiveCollabDashboardContribution extends Disposable implements IWorkbenchContribution {
+	static readonly ID = 'workbench.contrib.livecollabDashboard';
+	constructor(
+		@IEditorResolverService editorResolverService: IEditorResolverService,
+		@IInstantiationService private readonly instantiationService: IInstantiationService,
+		@ISecretStorageService private readonly secretStorageService: ISecretStorageService,
+		@IEditorService private readonly editorService: IEditorService,
+		@IWorkspaceContextService private readonly workspaceContextService: IWorkspaceContextService,
+	) {
+		super();
+		this._register(editorResolverService.registerEditor(
+			`${LiveCollabDashboardInput.RESOURCE.scheme}://**`,
+			{
+				id: LiveCollabDashboardEditor.ID,
+				label: 'LiveCollab Dashboard',
+				priority: RegisteredEditorPriority.builtin,
+			},
+			{ singlePerResource: true, canSupportResource: uri => uri.scheme === LiveCollabDashboardInput.RESOURCE.scheme },
+			{
+				createEditorInput: () => ({
+					editor: this.instantiationService.createInstance(LiveCollabDashboardInput),
+					options: { pinned: true }
+				})
+			}
+		));
+		// Whole-window-first: signed in + no folder open -> dashboard is the front door
+		this.secretStorageService.get('livecollab.token').then(token => {
+			if (token && this.workspaceContextService.getWorkbenchState() === WorkbenchState.EMPTY) {
+				const input = this.instantiationService.createInstance(LiveCollabDashboardInput);
+				this.editorService.openEditor(input, { pinned: true }).catch(console.error);
+			}
+		});
+	}
+}
+Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).registerWorkbenchContribution(
+	LiveCollabDashboardContribution,
+	LifecyclePhase.Restored
+);
