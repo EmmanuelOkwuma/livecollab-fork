@@ -213,6 +213,7 @@ Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane
 import { LiveCollabDashboardInput } from './livecollabDashboardInput.js';
 import { LiveCollabDashboardEditor } from './livecollabDashboardEditor.js';
 import { IWorkspaceContextService, WorkbenchState } from '../../../../platform/workspace/common/workspace.js';
+import { IWorkspaceEditingService } from '../../../services/workspaces/common/workspaceEditing.js';
 import { MenuRegistry, MenuId } from '../../../../platform/actions/common/actions.js';
 
 Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane(
@@ -273,6 +274,13 @@ class LiveCollabStartupOwner extends Disposable implements IWorkbenchContributio
 	) {
 		super();
 		(async () => {
+			// Ghost suppression: livecollab:// virtual folders are session artifacts —
+			// they must never survive a reload. Strip before deciding doors.
+			const ghosts = workspaceContextService.getWorkspace().folders.filter(f => f.uri.scheme === 'livecollab');
+			if (ghosts.length) {
+				const workspaceEditingService = instantiationService.invokeFunction(accessor => accessor.get(IWorkspaceEditingService));
+				await workspaceEditingService.removeFolders(ghosts.map(g => g.uri)).catch(console.error);
+			}
 			const token = await secretStorageService.get('livecollab.token');
 			if (!token) {
 				// Door 1: signed out — sign-in IS the window
