@@ -139,7 +139,7 @@ export function defaultBrowserWindowOptions(accessor: ServicesAccessor, windowSt
 		minWidth: WindowMinimumSize.WIDTH,
 		minHeight: WindowMinimumSize.HEIGHT,
 		title: productService.nameLong,
-		show: windowState.mode !== WindowMode.Maximized && windowState.mode !== WindowMode.Fullscreen, // reduce flicker by showing later
+		show: false, // livecollab: window opens hidden; bootstrap sends vscode:livecollab-ready when first page is painted
 		x: windowState.x,
 		y: windowState.y,
 		width: windowState.width,

@@ -719,6 +719,13 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			this._win = new electron.BrowserWindow(options);
 			mark('code/didCreateCodeBrowserWindow');
 
+			// livecollab: show window when bootstrap signals first page is painted
+			electron.ipcMain.once('vscode:livecollab-ready', (_event) => {
+				if (this._win && !this._win.isDestroyed()) {
+					this._win.show();
+				}
+			});
+
 			this._id = this._win.id;
 			this.setWin(this._win, options);
 
@@ -1213,7 +1220,7 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 		} else if (configuration.isSessionsWindow) {
 			windowUrl = FileAccess.asBrowserUri(`vs/sessions/electron-browser/sessions${this.environmentMainService.isBuilt ? '' : '-dev'}.html`).toString(true);
 		} else {
-			windowUrl = FileAccess.asBrowserUri(`vs/code/electron-browser/workbench/workbench${this.environmentMainService.isBuilt ? '' : '-dev'}.html`).toString(true);
+			windowUrl = FileAccess.asBrowserUri(`vs/code/electron-browser/workbench/livecollab-bootstrap${this.environmentMainService.isBuilt ? '' : '-dev'}.html`).toString(true);
 		}
 		this._win.loadURL(windowUrl);
 
