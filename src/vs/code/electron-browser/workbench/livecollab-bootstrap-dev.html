@@ -114,7 +114,7 @@
 		<div class="land-btn land-signin" id="go-signin">Sign In</div>
 		<div class="land-btn land-signup" id="go-signup">Sign Up</div>
 	</div>
-	<div class="land-foot">Live collaboration features require you to be signed in. &nbsp;·&nbsp; <span style="color:#3F8FD0;cursor:pointer;" id="preview-describe">Preview onboarding →</span></div>
+	<div class="land-foot">Live collaboration features require you to be signed in.</div>
 </div>
 
 <!-- ══════════════ SIGN IN ══════════════ -->
@@ -152,7 +152,12 @@
 				<div class="input-label">Email</div>
 				<input class="auth-input" type="email" placeholder="you@example.com" id="si-email"/>
 			</div>
-			<div class="continue-btn">Continue</div>
+			<div class="input-group input-full" style="margin-bottom:14px">
+				<div class="input-label">Password</div>
+				<input class="auth-input" type="password" placeholder="••••••••" id="si-password"/>
+			</div>
+			<div class="continue-btn" id="si-continue" style="text-align:center">Continue</div>
+			<div id="si-error" style="color:#F14C4C;font-size:12px;text-align:center;margin-bottom:8px;display:none"></div>
 			<div class="switch">Don't have an account? <a id="go-signup-from-signin">Sign up</a></div>
 		</div>
 	</div>
@@ -235,8 +240,7 @@
 			show('page-landing');
 		});
 		const suContinue = document.getElementById('su-continue');
-		const previewDescribe = document.getElementById('preview-describe');
-		if (previewDescribe) previewDescribe.addEventListener('click', () => show('page-describe'));
+
 		if (suContinue) suContinue.addEventListener('click', () => show('page-describe'));
 	});
 
@@ -246,7 +250,87 @@
 			window.vscode?.ipcRenderer?.send('vscode:livecollab-ready');
 		}));
 	});
-</script>
+
+	// ── AUTH WIRING ──
+	const SERVER = 'http://localhost:4000';
+
+	async function storeToken(token) {
+		if (window.vscode?.ipcRenderer) {
+			window.vscode.ipcRenderer.send('vscode:livecollab-store-token', token);
+		}
+	}
+
+	// Sign In
+	window.addEventListener('DOMContentLoaded', () => {
+		const siContinue = document.getElementById('si-continue');
+		if (siContinue) {
+			siContinue.addEventListener('click', async () => {
+				const email = document.getElementById('si-email').value.trim();
+				const password = document.getElementById('si-password').value;
+				const err = document.getElementById('si-error');
+				err.style.display = 'none';
+				if (!email || !password) { err.textContent = 'Please enter your email and password.'; err.style.display = 'block'; return; }
+				siContinue.textContent = 'Signing in…';
+				try {
+					const res = await fetch(SERVER + '/auth/login', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ email, password })
+					});
+					const text = await res.text();
+					if (!res.ok) {
+						err.textContent = text === 'invalid_credentials' ? 'Incorrect email or password.' : 'Something went wrong. Try again.';
+						err.style.display = 'block';
+						siContinue.textContent = 'Continue';
+						return;
+					}
+					const { token } = JSON.parse(text);
+					await storeToken(token);
+					show('page-describe');
+				} catch {
+					err.textContent = 'Could not reach the server. Is it running?';
+					err.style.display = 'block';
+					siContinue.textContent = 'Continue';
+				}
+			});
+		}
+
+		// Sign Up
+		const suContinue = document.getElementById('su-continue');
+		if (suContinue) {
+			suContinue.addEventListener('click', async () => {
+				const email = document.getElementById('su-email').value.trim();
+				const password = document.getElementById('su-password').value;
+				const err = document.getElementById('su-error');
+				err.style.display = 'none';
+				if (!email || !password) { err.textContent = 'Please enter your email and password.'; err.style.display = 'block'; return; }
+				suContinue.textContent = 'Creating account…';
+				try {
+					const res = await fetch(SERVER + '/auth/register', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ email, password })
+					});
+					const text = await res.text();
+					if (!res.ok) {
+						err.textContent = text === 'user_exists' ? 'An account with this email already exists. Sign in instead.' : 'Something went wrong. Try again.';
+						err.style.display = 'block';
+						suContinue.textContent = 'Continue';
+						return;
+					}
+					const { token } = JSON.parse(text);
+					await storeToken(token);
+					show('page-describe');
+				} catch {
+					err.textContent = 'Could not reach the server. Is it running?';
+					err.style.display = 'block';
+					suContinue.textContent = 'Continue';
+				}
+			});
+		}
+	});
+
+	</script>
 
 <!-- ══════════════ DESCRIBE YOU ══════════════ -->
 <div id="page-describe">

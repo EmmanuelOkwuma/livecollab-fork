@@ -28,6 +28,7 @@ import './livecollabCursorContribution.js';
 import { IRequestService } from '../../../../platform/request/common/request.js';
 import { IWorkbenchContribution } from '../../../common/contributions.js';
 import { Disposable } from '../../../../base/common/lifecycle.js';
+import { ISecretStorageService } from '../../../../platform/secrets/common/secrets.js';
 
 // Bootstrap contribution — runs at startup to wire IRequestService into livecollabService
 class LiveCollabBootstrap extends Disposable implements IWorkbenchContribution {
@@ -196,5 +197,44 @@ Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).regi
 
 Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).registerWorkbenchContribution(
 	LiveCollabFolderContribution,
+	LifecyclePhase.Restored
+);
+
+// ===== LiveCollab Startup Owner =====
+// Reads pending token from main process (set by bootstrap after auth),
+// stores it in the OS keychain via secretStorageService, then connects.
+
+class LiveCollabStartupOwner extends Disposable implements IWorkbenchContribution {
+	static readonly ID = 'workbench.contrib.livecollabStartupOwner';
+	constructor(
+		@ISecretStorageService private readonly secretStorageService: ISecretStorageService,
+	) {
+		super();
+		this._boot();
+	}
+
+	private async _boot(): Promise<void> {
+		try {
+			const token = await (window as any).vscode?.ipcRenderer?.invoke('vscode:livecollab-get-pending-token') as string | undefined;
+			if (token) {
+				// Store in OS keychain — same key the rest of the app reads
+				await this.secretStorageService.set('livecollab.token', token);
+				console.log('[LiveCollab] token received from bootstrap and stored in keychain');
+			}
+			// Now read token (either just stored or pre-existing) and connect
+			const stored = await this.secretStorageService.get('livecollab.token');
+			if (stored) {
+				livecollabService.setToken(stored);
+				await livecollabService.connect();
+				console.log('[LiveCollab] connected with stored token');
+			}
+		} catch (e) {
+			console.error('[LiveCollab] startup owner error:', e);
+		}
+	}
+}
+
+Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).registerWorkbenchContribution(
+	LiveCollabStartupOwner,
 	LifecyclePhase.Restored
 );

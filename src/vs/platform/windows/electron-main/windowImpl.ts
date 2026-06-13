@@ -726,6 +726,23 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 				}
 			});
 
+			// livecollab: receive token from bootstrap — hold in memory only (never disk)
+			let _pendingToken: string | undefined;
+			electron.ipcMain.once('vscode:livecollab-store-token', (_event, token: string) => {
+				_pendingToken = token;
+				if (this._win && !this._win.isDestroyed()) {
+					const workbenchUrl = FileAccess.asBrowserUri(
+						`vs/code/electron-browser/workbench/workbench${this.environmentMainService.isBuilt ? '' : '-dev'}.html`
+					).toString(true);
+					this._win.loadURL(workbenchUrl);
+				}
+			});
+			electron.ipcMain.handle('vscode:livecollab-get-pending-token', (_event) => {
+				const token = _pendingToken;
+				_pendingToken = undefined;
+				return token;
+			});
+
 			this._id = this._win.id;
 			this.setWin(this._win, options);
 
