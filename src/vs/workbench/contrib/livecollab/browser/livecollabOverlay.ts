@@ -78,7 +78,16 @@ export class LiveCollabOverlay extends Disposable implements IOverlayNav {
 		this._pageHost.style.cssText = `flex: 1; display: flex; align-items: center; justify-content: center; overflow-y: auto;`;
 
 		this._seal(true);
+
+		// CSS flash-kill: inject before workbench paints so it never shows through.
+		const style = document.createElement('style');
+		style.id = 'livecollab-flash-kill';
+		style.textContent = '.monaco-workbench { opacity: 0 !important; transition: opacity 220ms ease; }';
+		document.head.appendChild(style);
+		this._flashKillStyle = style;
 	}
+
+	private _flashKillStyle: HTMLStyleElement | undefined;
 
 	registerPage(page: IOverlayPage): void {
 		this._pages.set(page.id, page);
@@ -137,18 +146,30 @@ export class LiveCollabOverlay extends Disposable implements IOverlayNav {
 	canForward(): boolean { return this._cursor < this._history.length - 1; }
 
 	dismiss(): void {
-		// Dissolve to reveal the workspace (room entry). Short fade.
+		// Reveal the workbench (remove flash-kill) then dissolve the overlay.
+		if (this._flashKillStyle) {
+			this._flashKillStyle.textContent = '.monaco-workbench { opacity: 1 !important; transition: opacity 220ms ease; }';
+		}
 		this._root.style.transition = 'opacity 220ms ease';
 		this._root.style.opacity = '0';
 		setTimeout(() => {
 			this._seal(false);
 			this._root.style.opacity = '1';
+			this._flashKillStyle?.remove();
+			this._flashKillStyle = undefined;
 			this._onDidDismiss.fire();
 		}, 220);
 	}
 
 	reopen(pageId: OverlayPageId): void {
-		// Coming back from the workspace to the dashboard.
+		// Coming back from the workspace to the dashboard — re-hide the workbench.
+		if (!this._flashKillStyle) {
+			const style = document.createElement('style');
+			style.id = 'livecollab-flash-kill';
+			style.textContent = '.monaco-workbench { opacity: 0 !important; }';
+			document.head.appendChild(style);
+			this._flashKillStyle = style;
+		}
 		this._history = [pageId];
 		this._cursor = 0;
 		this._seal(true);
