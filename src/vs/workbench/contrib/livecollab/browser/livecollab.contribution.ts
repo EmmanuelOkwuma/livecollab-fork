@@ -212,10 +212,14 @@ Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane
 // ===== LiveCollab Dashboard (Phase D week 1) =====
 import { LiveCollabDashboardInput } from './livecollabDashboardInput.js';
 import { LiveCollabDashboardEditor } from './livecollabDashboardEditor.js';
-import { IWorkspaceContextService, WorkbenchState } from '../../../../platform/workspace/common/workspace.js';
+import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
 import { IWorkspaceEditingService } from '../../../services/workspaces/common/workspaceEditing.js';
+import { LiveCollabOverlay } from './livecollabOverlay.js';
+import { LiveCollabSignInPage } from './livecollabSignInPage.js';
+import { LiveCollabDashboardPage } from './livecollabDashboardPage.js';
+import { ICommandService } from '../../../../platform/commands/common/commands.js';
 import { mainWindow } from '../../../../base/browser/window.js';
-import { IWorkbenchLayoutService, Parts } from '../../../services/layout/browser/layoutService.js';
+import { IWorkbenchLayoutService } from '../../../services/layout/browser/layoutService.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import { MenuRegistry, MenuId } from '../../../../platform/actions/common/actions.js';
 
@@ -266,125 +270,75 @@ Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).regi
 	LifecyclePhase.Restored
 );
 
-// ===== LiveCollab Startup Owner — the ONE startup brain + the DOOR (Page Law, council r3+r4) =====
+// ===== LiveCollab Startup Owner — mounts the OVERLAY (council: full-window app surfaces) =====
 class LiveCollabStartupOwner extends Disposable implements IWorkbenchContribution {
 	static readonly ID = 'workbench.contrib.livecollabStartupOwner';
+
+	private _overlay: LiveCollabOverlay | undefined;
+
 	constructor(
-		@ISecretStorageService secretStorageService: ISecretStorageService,
-		@IInstantiationService instantiationService: IInstantiationService,
-		@IEditorService editorService: IEditorService,
-		@IWorkspaceContextService workspaceContextService: IWorkspaceContextService,
-		@IWorkbenchLayoutService layoutService: IWorkbenchLayoutService,
+		@ISecretStorageService private readonly secretStorageService: ISecretStorageService,
+		@IInstantiationService private readonly instantiationService: IInstantiationService,
+		@IWorkspaceContextService private readonly workspaceContextService: IWorkspaceContextService,
+		@IWorkbenchLayoutService private readonly layoutService: IWorkbenchLayoutService,
 		@IConfigurationService configurationService: IConfigurationService,
 	) {
 		super();
 
-		// The welcome page belongs inside the workspace (user ruling) — never at startup.
+		// Welcome page belongs inside the workspace only (user ruling).
 		configurationService.updateValue('workbench.startupEditor', 'none').catch(console.error);
 
-		const closeDoors = async () => {
-			// App page mode: the window IS the page. No IDE furniture.
-			layoutService.setPartHidden(true, Parts.ACTIVITYBAR_PART);
-			layoutService.setPartHidden(true, Parts.SIDEBAR_PART);
-			layoutService.setPartHidden(true, Parts.PANEL_PART);
-			layoutService.setPartHidden(true, Parts.AUXILIARYBAR_PART);
-			layoutService.setPartHidden(true, Parts.STATUSBAR_PART);
-			await configurationService.updateValue('workbench.editor.showTabs', 'none').catch(console.error);
-		};
+		this.layoutService.whenRestored.then(() => this._boot());
+	}
 
-		const openShell = async () => {
-			// Workspace mode: a room (or folder) summoned the IDE.
-			layoutService.setPartHidden(false, Parts.ACTIVITYBAR_PART);
-			layoutService.setPartHidden(false, Parts.SIDEBAR_PART);
-			layoutService.setPartHidden(false, Parts.STATUSBAR_PART);
-			await configurationService.updateValue('workbench.editor.showTabs', undefined).catch(console.error);
-		};
+	private async _boot(): Promise<void> {
+		const container = this.layoutService.getContainer(mainWindow);
 
-		// Kill the flash: if this window is roomless RIGHT NOW, the shell hides before anything paints further.
-		if (workspaceContextService.getWorkbenchState() === WorkbenchState.EMPTY) {
-			layoutService.setPartHidden(true, Parts.ACTIVITYBAR_PART);
-			layoutService.setPartHidden(true, Parts.SIDEBAR_PART);
-			layoutService.setPartHidden(true, Parts.PANEL_PART);
-			layoutService.setPartHidden(true, Parts.AUXILIARYBAR_PART);
-			layoutService.setPartHidden(true, Parts.STATUSBAR_PART);
+		// Strip any restored folders — a fresh window has no room to own them.
+		const restored = this.workspaceContextService.getWorkspace().folders.map(f => f.uri);
+		if (restored.length) {
+			const wes = this.instantiationService.invokeFunction(accessor => accessor.get(IWorkspaceEditingService));
+			await wes.removeFolders(restored).catch(console.error);
 		}
 
-		(async () => {
-			// Ghost suppression: livecollab:// virtual folders are session artifacts —
-			// they must never survive a reload. Strip before deciding doors.
-			const ghosts = workspaceContextService.getWorkspace().folders.filter(f => f.uri.scheme === 'livecollab');
-			if (ghosts.length) {
-				const workspaceEditingService = instantiationService.invokeFunction(accessor => accessor.get(IWorkspaceEditingService));
-				await workspaceEditingService.removeFolders(ghosts.map(g => g.uri)).catch(console.error);
-			}
+		// Mount the overlay above the workbench.
+		this._overlay = this._register(new LiveCollabOverlay(container, container));
 
-			// THE LAW at startup: no room context exists yet on a fresh window, so restored
-			// folders have no owner — strip them. Reload lands on the dashboard, always.
-			const restored = workspaceContextService.getWorkspace().folders.map(f => f.uri);
-			if (restored.length) {
-				const workspaceEditingService = instantiationService.invokeFunction(accessor => accessor.get(IWorkspaceEditingService));
-				await workspaceEditingService.removeFolders(restored).catch(console.error);
-			}
+		// Pages.
+		const signIn = new LiveCollabSignInPage(
+			() => this.instantiationService.invokeFunction(async accessor => {
+				// Log In: open the existing sign-in editor flow INSIDE the overlay host is future work;
+				// for now trigger the real sign-in command, then advance to dashboard on success.
+				await accessor.get(ICommandService).executeCommand('livecollab.signIn');
+			}),
+			() => this.instantiationService.invokeFunction(async accessor => {
+				await accessor.get(ICommandService).executeCommand('livecollab.signIn');
+			}),
+		);
+		this._overlay.registerPage(signIn);
 
-			// Roomless window: the door closes around a single page.
-			await closeDoors();
-			const token = await secretStorageService.get('livecollab.token');
-			if (!token) {
-				// Door 1: signed out — sign-in IS the window
-				const signIn = instantiationService.createInstance(LiveCollabSignInInput);
-				await editorService.openEditor(signIn, { pinned: true });
-				return;
-			}
-			// Door 2: signed in — dashboard is the resting state
-			livecollabService.setToken(token);
-			livecollabService.connect().catch(console.error);
-			const dash = instantiationService.createInstance(LiveCollabDashboardInput);
-			await editorService.openEditor(dash, { pinned: true });
-			// The dashboard is the page: nothing else belongs in a roomless window.
-			for (const other of editorService.editors) {
-				if (!(other instanceof LiveCollabDashboardInput)) {
-					editorService.closeEditors(editorService.findEditors(other.resource!)).catch(() => { });
-				}
-			}
-		})().catch(console.error);
+		const dashboard = new LiveCollabDashboardPage(
+			() => this._overlay!.dismiss(),  // entering a room dissolves the overlay
+		);
+		this._overlay.registerPage(dashboard);
 
-		// THE SEAL: while roomless, the shell stays hidden no matter who toggles it.
-		this._register(layoutService.onDidChangePartVisibility(() => {
-			const roomlessNow = workspaceContextService.getWorkbenchState() === WorkbenchState.EMPTY && !livecollabService.roomId;
-			if (!roomlessNow) { return; }
-			for (const part of [Parts.ACTIVITYBAR_PART, Parts.SIDEBAR_PART, Parts.PANEL_PART, Parts.AUXILIARYBAR_PART, Parts.STATUSBAR_PART]) {
-				if (layoutService.isVisible(part, mainWindow)) {
-					layoutService.setPartHidden(true, part);
-				}
-			}
-		}));
+		// Decide the first page.
+		const token = await this.secretStorageService.get('livecollab.token');
+		if (!token) {
+			this._overlay.go('signin');
+			return;
+		}
+		livecollabService.setToken(token);
+		livecollabService.connect().catch(console.error);
+		this._overlay.go('dashboard');
 
-		// THE LAW: a roomless window holds no folders. A folder may only live inside a room.
-		// Folder arrives + room active = the workspace materializes. Without a room = stripped, back to the dashboard.
-		this._register(workspaceContextService.onDidChangeWorkbenchState(async state => {
-			if (state !== WorkbenchState.EMPTY) {
-				if (livecollabService.roomId) {
-					await openShell();
-				} else {
-					const intruders = workspaceContextService.getWorkspace().folders.map(f => f.uri);
-					if (intruders.length) {
-						const workspaceEditingService = instantiationService.invokeFunction(accessor => accessor.get(IWorkspaceEditingService));
-						await workspaceEditingService.removeFolders(intruders).catch(console.error);
-					}
-					await closeDoors();
-					const dash = instantiationService.createInstance(LiveCollabDashboardInput);
-					await editorService.openEditor(dash, { pinned: true });
-				}
-			} else {
-				if (!livecollabService.roomId) {
-					await closeDoors();
-					const dash = instantiationService.createInstance(LiveCollabDashboardInput);
-					await editorService.openEditor(dash, { pinned: true });
-				}
-			}
+		// Token appears (just signed in) → advance to dashboard.
+		this._register(livecollabService.onConnected(() => {
+			this._overlay?.go('dashboard');
 		}));
 	}
 }
+
 Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).registerWorkbenchContribution(
 	LiveCollabStartupOwner,
 	LifecyclePhase.Restored
