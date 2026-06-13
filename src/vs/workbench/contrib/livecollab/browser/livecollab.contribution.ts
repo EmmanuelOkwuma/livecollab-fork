@@ -214,6 +214,7 @@ import { LiveCollabDashboardInput } from './livecollabDashboardInput.js';
 import { LiveCollabDashboardEditor } from './livecollabDashboardEditor.js';
 import { IWorkspaceContextService, WorkbenchState } from '../../../../platform/workspace/common/workspace.js';
 import { IWorkspaceEditingService } from '../../../services/workspaces/common/workspaceEditing.js';
+import { mainWindow } from '../../../../base/browser/window.js';
 import { IWorkbenchLayoutService, Parts } from '../../../services/layout/browser/layoutService.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import { MenuRegistry, MenuId } from '../../../../platform/actions/common/actions.js';
@@ -278,6 +279,9 @@ class LiveCollabStartupOwner extends Disposable implements IWorkbenchContributio
 	) {
 		super();
 
+		// The welcome page belongs inside the workspace (user ruling) — never at startup.
+		configurationService.updateValue('workbench.startupEditor', 'none').catch(console.error);
+
 		const closeDoors = async () => {
 			// App page mode: the window IS the page. No IDE furniture.
 			layoutService.setPartHidden(true, Parts.ACTIVITYBAR_PART);
@@ -295,6 +299,15 @@ class LiveCollabStartupOwner extends Disposable implements IWorkbenchContributio
 			layoutService.setPartHidden(false, Parts.STATUSBAR_PART);
 			await configurationService.updateValue('workbench.editor.showTabs', undefined).catch(console.error);
 		};
+
+		// Kill the flash: if this window is roomless RIGHT NOW, the shell hides before anything paints further.
+		if (workspaceContextService.getWorkbenchState() === WorkbenchState.EMPTY) {
+			layoutService.setPartHidden(true, Parts.ACTIVITYBAR_PART);
+			layoutService.setPartHidden(true, Parts.SIDEBAR_PART);
+			layoutService.setPartHidden(true, Parts.PANEL_PART);
+			layoutService.setPartHidden(true, Parts.AUXILIARYBAR_PART);
+			layoutService.setPartHidden(true, Parts.STATUSBAR_PART);
+		}
 
 		(async () => {
 			// Ghost suppression: livecollab:// virtual folders are session artifacts —
@@ -334,6 +347,17 @@ class LiveCollabStartupOwner extends Disposable implements IWorkbenchContributio
 				}
 			}
 		})().catch(console.error);
+
+		// THE SEAL: while roomless, the shell stays hidden no matter who toggles it.
+		this._register(layoutService.onDidChangePartVisibility(() => {
+			const roomlessNow = workspaceContextService.getWorkbenchState() === WorkbenchState.EMPTY && !livecollabService.roomId;
+			if (!roomlessNow) { return; }
+			for (const part of [Parts.ACTIVITYBAR_PART, Parts.SIDEBAR_PART, Parts.PANEL_PART, Parts.AUXILIARYBAR_PART, Parts.STATUSBAR_PART]) {
+				if (layoutService.isVisible(part, mainWindow)) {
+					layoutService.setPartHidden(true, part);
+				}
+			}
+		}));
 
 		// THE LAW: a roomless window holds no folders. A folder may only live inside a room.
 		// Folder arrives + room active = the workspace materializes. Without a room = stripped, back to the dashboard.
