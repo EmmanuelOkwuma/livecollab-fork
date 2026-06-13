@@ -293,7 +293,11 @@ class LiveCollabStartupOwner extends Disposable implements IWorkbenchContributio
 		const mountTarget = mainWindow.document.body;
 		this._overlay = this._register(new LiveCollabOverlay(mountTarget, container));
 		this._overlay.go('signin'); // show something immediately, _boot will correct it
-		this.layoutService.whenRestored.then(() => this._boot());
+		// Mount overlay synchronously in constructor — covers body before editor area renders.
+		const _container = this.layoutService.getContainer(mainWindow);
+		this._overlay = this._register(new LiveCollabOverlay(mainWindow.document.body, _container));
+		this._overlay.go('signin'); // cover immediately; _boot corrects the page
+		this._boot().catch(console.error);
 	}
 
 	private async _boot(): Promise<void> {
