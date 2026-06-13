@@ -288,22 +288,22 @@ class LiveCollabStartupOwner extends Disposable implements IWorkbenchContributio
 		// Welcome page belongs inside the workspace only (user ruling).
 		configurationService.updateValue('workbench.startupEditor', 'none').catch(console.error);
 
+		// Mount immediately — before whenRestored — so the overlay is up BEFORE the workbench paints.
+		const container = this.layoutService.getContainer(mainWindow);
+		const mountTarget = mainWindow.document.body;
+		this._overlay = this._register(new LiveCollabOverlay(mountTarget, container));
+		this._overlay.go('signin'); // show something immediately, _boot will correct it
 		this.layoutService.whenRestored.then(() => this._boot());
 	}
 
 	private async _boot(): Promise<void> {
-		const container = this.layoutService.getContainer(mainWindow);
-		const mountTarget = mainWindow.document.body; // overlay is a sibling of the workbench, not inside it
-
+		if (!this._overlay) { return; }
 		// Strip any restored folders — a fresh window has no room to own them.
 		const restored = this.workspaceContextService.getWorkspace().folders.map(f => f.uri);
 		if (restored.length) {
 			const wes = this.instantiationService.invokeFunction(accessor => accessor.get(IWorkspaceEditingService));
 			await wes.removeFolders(restored).catch(console.error);
 		}
-
-		// Mount the overlay above the workbench (sibling of mainContainer; inerts only the workbench).
-		this._overlay = this._register(new LiveCollabOverlay(mountTarget, container));
 
 		// Pages.
 		const signIn = new LiveCollabSignInPage(

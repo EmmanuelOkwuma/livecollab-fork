@@ -32,7 +32,7 @@ export class LiveCollabDashboardPage implements IOverlayPage {
 		createBtn.onmouseleave = () => createBtn.style.background = '#0E639C';
 
 		const sub = append(page, $('div'));
-		sub.textContent = 'A room is your team\\u2019s permanent home. It stays even when everyone leaves.';
+		sub.textContent = 'A room is your team\’s permanent home. It stays even when everyone leaves.';
 		sub.style.cssText = `font-size: 13px; color: #9D9D9D; margin-bottom: 28px;`;
 
 		const list = append(page, $('div'));
@@ -41,7 +41,7 @@ export class LiveCollabDashboardPage implements IOverlayPage {
 		const loadRooms = async () => {
 			clearNode(list);
 			const loading = append(list, $('div'));
-			loading.textContent = 'Loading\\u2026';
+			loading.textContent = 'Loading\…';
 			loading.style.cssText = `font-size: 13px; color: #6E6E6E;`;
 			let rooms: any[] = [];
 			try { rooms = await livecollabService.listMyRooms(); } catch { /* ignore */ }
@@ -72,7 +72,7 @@ export class LiveCollabDashboardPage implements IOverlayPage {
 				role.style.cssText = `font-size: 11px; color: #9D9D9D;`;
 
 				const open = append(card, $('div'));
-				open.textContent = 'Open \\u2192';
+				open.textContent = 'Open \→';
 				open.style.cssText = `font-size: 13px; color: #007ACC; cursor: pointer; font-weight: 500;`;
 				open.onclick = async () => {
 					livecollabService.setRoomContext(room.name, room.accessRole);
