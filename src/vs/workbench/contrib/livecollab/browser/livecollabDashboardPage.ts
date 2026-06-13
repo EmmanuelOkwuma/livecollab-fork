@@ -17,7 +17,7 @@ export class LiveCollabDashboardPage implements IOverlayPage {
 
 	render(container: HTMLElement, _nav: IOverlayNav): void {
 		const page = append(container, $('div'));
-		page.style.cssText = `width: 100%; max-width: 720px; padding: 48px 32px; align-self: flex-start; margin: 0 auto;`;
+		page.style.cssText = `width: 100%; max-width: 560px; padding: 40px 24px; align-self: flex-start; margin: 0 auto;`;
 
 		// Header
 		const header = append(page, $('div'));
@@ -57,7 +57,8 @@ export class LiveCollabDashboardPage implements IOverlayPage {
 				card.style.cssText = `
 					display: flex; align-items: center; justify-content: space-between;
 					background: #1E1E1E; border: 1px solid #2B2B2B; border-left: 3px solid #007ACC;
-					border-radius: 8px; padding: 16px 18px; transition: background 120ms ease;
+					border-radius: 8px; padding: 12px 16px; transition: background 120ms ease;
+					max-width: 480px; min-height: 0;
 				`;
 				card.onmouseenter = () => card.style.background = '#232323';
 				card.onmouseleave = () => card.style.background = '#1E1E1E';

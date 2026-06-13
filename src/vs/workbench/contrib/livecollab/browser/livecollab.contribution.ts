@@ -293,6 +293,7 @@ class LiveCollabStartupOwner extends Disposable implements IWorkbenchContributio
 
 	private async _boot(): Promise<void> {
 		const container = this.layoutService.getContainer(mainWindow);
+		const mountTarget = mainWindow.document.body; // overlay is a sibling of the workbench, not inside it
 
 		// Strip any restored folders — a fresh window has no room to own them.
 		const restored = this.workspaceContextService.getWorkspace().folders.map(f => f.uri);
@@ -301,8 +302,8 @@ class LiveCollabStartupOwner extends Disposable implements IWorkbenchContributio
 			await wes.removeFolders(restored).catch(console.error);
 		}
 
-		// Mount the overlay above the workbench.
-		this._overlay = this._register(new LiveCollabOverlay(container, container));
+		// Mount the overlay above the workbench (sibling of mainContainer; inerts only the workbench).
+		this._overlay = this._register(new LiveCollabOverlay(mountTarget, container));
 
 		// Pages.
 		const signIn = new LiveCollabSignInPage(
