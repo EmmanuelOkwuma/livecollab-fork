@@ -737,6 +737,11 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 					this._win.loadURL(workbenchUrl);
 				}
 			});
+			electron.ipcMain.handle('vscode:livecollab-get-pending-reset-token', (_event) => {
+			const resetToken = (global as any)._livecollabPendingResetToken;
+			(global as any)._livecollabPendingResetToken = undefined;
+			return resetToken;
+		});
 			electron.ipcMain.handle('vscode:livecollab-get-pending-token', (_event) => {
 				const token = _pendingToken;
 				_pendingToken = undefined;

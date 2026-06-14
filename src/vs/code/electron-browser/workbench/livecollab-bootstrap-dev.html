@@ -232,10 +232,115 @@
 	<div class="auth-foot">By creating an account, you agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.</div>
 </div>
 
+
+
+<!-- ══════════════ DESCRIBE YOU ══════════════ -->
+<div id="page-describe">
+	<div class="wm">
+		<svg class="mark-sm" viewBox="0 0 110 110" fill="none" xmlns="http://www.w3.org/2000/svg">
+			<g transform="translate(11,14) scale(0.92)">
+				<circle cx="34" cy="24" r="11" fill="#2563EB"/>
+				<rect x="28.5" y="24" width="11" height="50" rx="5.5" fill="#2563EB"/>
+				<circle cx="62" cy="38" r="8.5" fill="#60A5FA"/>
+				<rect x="57.75" y="38" width="8.5" height="36" rx="4.25" fill="#60A5FA"/>
+			</g>
+		</svg>
+		<span class="wm-name">LiveCollab</span>
+	</div>
+	<div class="desc-col">
+		<div class="desc-title">What best describes you?</div>
+		<div class="desc-sub">This helps us tailor <span style="color:#007ACC;font-weight:700">LiveCollab</span> to how you work.</div>
+		<div style="height:28px"></div>
+		<div class="desc-grid">
+			<div class="desc-card" data-type="student">
+				<span class="desc-check">✓</span>
+				
+				<div class="desc-card-title">Student</div>
+				<div class="desc-card-desc">Coursework, group projects, and learning to code</div>
+			</div>
+			<div class="desc-card" data-type="developer">
+				<span class="desc-check">✓</span>
+				
+				<div class="desc-card-title">Developer</div>
+				<div class="desc-card-desc">Professional or freelance coding</div>
+			</div>
+			<div class="desc-card" data-type="team">
+				<span class="desc-check">✓</span>
+				
+				<div class="desc-card-title">Team / Lead</div>
+				<div class="desc-card-desc">Building and shipping with a team</div>
+			</div>
+			<div class="desc-card" data-type="hobbyist">
+				<span class="desc-check">✓</span>
+				
+				<div class="desc-card-title">Hobbyist</div>
+				<div class="desc-card-desc">Side projects and exploring new ideas</div>
+			</div>
+		</div>
+		<div class="desc-skip" id="desc-skip">Skip</div>
+	</div>
+</div>
+
+
+<!-- PAGE A: Reset your password -->
+<div id="page-reset-a" style="position:fixed;inset:0;background:#181818;display:none;">
+	<div style="position:absolute;top:30px;left:34px;font-size:13px;color:#9D9D9D;cursor:pointer;" id="reset-a-back">← Back to sign in</div>
+	<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+		<div style="width:430px;display:flex;flex-direction:column;">
+			<div style="font-size:28px;font-weight:600;color:#F2F2F2;margin-bottom:6px;">Reset your password</div>
+			<div style="font-size:18px;color:#5C5C5C;margin-bottom:28px;">Enter your email and we’ll send you a reset link.</div>
+			<div id="reset-a-form">
+				<div class="input-label">Email</div>
+				<input class="auth-input" type="email" id="reset-a-email" placeholder="you@example.com" style="margin-bottom:14px;"/>
+				<div id="reset-a-error" style="color:#F14C4C;font-size:12px;margin-bottom:8px;display:none;"></div>
+				<div class="continue-btn" id="reset-a-submit">Send reset link</div>
+			</div>
+			<div id="reset-a-success" style="display:none;">
+				<div style="color:#2EA043;font-size:14px;margin-bottom:20px;" id="reset-a-msg"></div>
+				<div class="continue-btn" id="reset-a-resend" disabled style="opacity:0.5;cursor:not-allowed;">Resend in 0:45</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<!-- PAGE B: Set a new password -->
+<div id="page-reset-b" style="position:fixed;inset:0;background:#181818;display:none;">
+	<div style="position:absolute;top:30px;left:34px;font-size:13px;color:#9D9D9D;cursor:pointer;" id="reset-b-back">← Back to sign in</div>
+	<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+		<div style="width:430px;display:flex;flex-direction:column;">
+			<div style="font-size:28px;font-weight:600;color:#F2F2F2;margin-bottom:6px;">Set a new password</div>
+			<div style="font-size:18px;color:#5C5C5C;margin-bottom:28px;">Choose something you’ll remember.</div>
+			<div id="reset-b-form">
+				<div class="input-label">New password</div>
+				<div class="pwd-wrap" style="margin-bottom:6px;">
+					<input class="auth-input" type="password" id="reset-b-pwd" placeholder="New password"/>
+					<span class="pwd-eye" onclick="togglePwd('reset-b-pwd',this)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
+				</div>
+				<div id="reset-b-checklist" style="display:none;margin-bottom:14px;flex-direction:column;gap:4px;">
+					<div id="reset-b-chk-len" style="font-size:11px;color:#6E6E6E;">• At least 8 characters</div>
+					<div id="reset-b-chk-num" style="font-size:11px;color:#6E6E6E;">• One number</div>
+					<div id="reset-b-chk-upper" style="font-size:11px;color:#6E6E6E;">• One uppercase letter</div>
+				</div>
+				<div class="input-label">Confirm new password</div>
+				<div class="pwd-wrap" style="margin-bottom:14px;">
+					<input class="auth-input" type="password" id="reset-b-confirm" placeholder="Re-enter new password"/>
+					<span class="pwd-eye" onclick="togglePwd('reset-b-confirm',this)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
+				</div>
+				<div id="reset-b-error" style="color:#F14C4C;font-size:12px;margin-bottom:8px;display:none;"></div>
+				<div class="continue-btn" id="reset-b-submit">Update password</div>
+			</div>
+			<div id="reset-b-success" style="display:none;">
+				<div style="color:#2EA043;font-size:14px;margin-bottom:20px;">Password updated. You can now sign in with your new password.</div>
+				<div class="continue-btn" id="reset-b-to-signin">Back to sign in</div>
+			</div>
+		</div>
+	</div>
+</div>
+
 <script>
 	// ── Page router ──
 	function show(id) {
-		['page-landing','page-signin','page-signup','page-describe'].forEach(p => {
+		['page-landing','page-signin','page-signup','page-describe','page-reset-a','page-reset-b'].forEach(p => {
 			document.getElementById(p).style.display = p === id ? (p === 'page-landing' ? 'flex' : 'block') : 'none';
 		});
 	}
@@ -381,54 +486,132 @@
 			updateChecklist();
 		});
 	}
+	
+	// Reset page navigation
+	document.getElementById('reset-a-back').onclick = () => show('page-signin');
+	document.getElementById('reset-b-back').onclick = () => show('page-signin');
+	document.getElementById('reset-b-to-signin').onclick = () => show('page-signin');
+
+
+	// Reset A: send link
+	let resetCooldown;
+	document.getElementById('reset-a-submit').addEventListener('click', async function() {
+		const email = document.getElementById('reset-a-email').value.trim();
+		const err = document.getElementById('reset-a-error');
+		err.style.display = 'none';
+		if (!email || !email.includes('@')) { err.textContent = 'Please enter a valid email.'; err.style.display = 'block'; return; }
+		this.textContent = 'Sending…';
+		try {
+			await fetch('http://localhost:4000/auth/forgot-password', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({email}) });
+			document.getElementById('reset-a-form').style.display = 'none';
+			const suc = document.getElementById('reset-a-success');
+			suc.style.display = 'block';
+			document.getElementById('reset-a-msg').textContent = 'Check your email — we sent a reset link to ' + email + '.';
+			startResetCooldown();
+		} catch {
+			err.textContent = 'Could not reach the server. Is it running?';
+			err.style.display = 'block';
+			this.textContent = 'Send reset link';
+		}
+	});
+	function startResetCooldown() {
+		const btn = document.getElementById('reset-a-resend');
+		let secs = 45;
+		btn.disabled = true; btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed';
+		btn.textContent = 'Resend in 0:' + String(secs).padStart(2,'0');
+		clearInterval(resetCooldown);
+		resetCooldown = setInterval(() => {
+			secs--;
+			if (secs <= 0) { clearInterval(resetCooldown); btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; btn.textContent = 'Resend'; return; }
+			btn.textContent = 'Resend in 0:' + String(secs).padStart(2,'0');
+		}, 1000);
+	}
+	document.getElementById('reset-a-resend').addEventListener('click', function() {
+		if (this.disabled) return;
+		startResetCooldown();
+		// TODO: re-send request
+	});
+
+	// Reset B: new password checklist
+	const resetPwd = document.getElementById('reset-b-pwd');
+	if (resetPwd) {
+		const rcl = document.getElementById('reset-b-checklist');
+		function updateResetChecklist() {
+			const v = resetPwd.value;
+			const lenOk = v.length >= 8, numOk = /[0-9]/.test(v), upOk = /[A-Z]/.test(v);
+			function setR(id, ok) { const el = document.getElementById(id); if (!el) return; el.style.color = ok ? '#2EA043' : '#6E6E6E'; el.textContent = (ok ? '\u2713' : '\u2022') + ' ' + el.textContent.slice(2); }
+			setR('reset-b-chk-len', lenOk); setR('reset-b-chk-num', numOk); setR('reset-b-chk-upper', upOk);
+			return lenOk && numOk && upOk;
+		}
+		resetPwd.addEventListener('focus', () => { if (rcl) rcl.style.display = 'flex'; });
+		resetPwd.addEventListener('blur', () => { if (rcl && updateResetChecklist()) rcl.style.display = 'none'; });
+		resetPwd.addEventListener('input', updateResetChecklist);
+	}
+
+	// Reset B: submit
+	document.getElementById('reset-b-submit').addEventListener('click', async function() {
+		const pwd = document.getElementById('reset-b-pwd').value;
+		const confirm = document.getElementById('reset-b-confirm').value;
+		const err = document.getElementById('reset-b-error');
+		err.style.display = 'none';
+		if (pwd.length < 8 || !/[0-9]/.test(pwd) || !/[A-Z]/.test(pwd)) { err.textContent = 'Password does not meet requirements.'; err.style.display = 'block'; return; }
+		if (pwd !== confirm) { err.textContent = 'Passwords do not match.'; err.style.display = 'block'; return; }
+		const token = window._resetToken;
+		if (!token) { err.textContent = 'Invalid reset link. Please request a new one.'; err.style.display = 'block'; return; }
+		this.textContent = 'Updating…';
+		try {
+			const res = await fetch('http://localhost:4000/auth/reset-password', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({token, newPassword: pwd}) });
+			const text = await res.text();
+			if (!res.ok) { err.textContent = text === 'expired_token' ? 'This link has expired. Please request a new one.' : 'Something went wrong.'; err.style.display = 'block'; this.textContent = 'Update password'; return; }
+			document.getElementById('reset-b-form').style.display = 'none';
+			document.getElementById('reset-b-success').style.display = 'block';
+		} catch {
+			err.textContent = 'Could not reach the server. Is it running?';
+			err.style.display = 'block';
+			this.textContent = 'Update password';
+		}
+	});
+
+	// wire forgot after all elements exist
+	document.getElementById('go-forgot').onclick = () => show('page-reset-a');
+	document.getElementById('reset-a-back').onclick = () => show('page-signin');
+	document.getElementById('reset-b-back').onclick = () => show('page-signin');
+	document.getElementById('reset-b-to-signin').onclick = () => show('page-signin');
+	// livecollab: listen for reset-password deep link token from main process
+	// Fires when user clicks the reset link while app is already open
+	if (window.vscode?.ipcRenderer) {
+		window.vscode.ipcRenderer.on('vscode:livecollab-reset-token', (_event, token) => {
+			window._resetToken = token;
+			// Validate token then show Page B
+			fetch('http://localhost:4000/auth/validate-reset-token?token=' + encodeURIComponent(token))
+				.then(r => r.json())
+				.then(data => {
+					if (data.valid) {
+						show('page-reset-b');
+					} else {
+						// Token expired or invalid — send to Page A with message
+						show('page-reset-a');
+						const err = document.getElementById('reset-a-error');
+						if (err) { err.textContent = 'This reset link has expired. Please request a new one.'; err.style.display = 'block'; }
+					}
+				})
+				.catch(() => show('page-reset-a'));
+		});
+
+		// Cold start: check if main process has a pending reset token
+		window.vscode.ipcRenderer.invoke('vscode:livecollab-get-pending-reset-token')
+			.then(token => {
+				if (token) {
+					window._resetToken = token;
+					fetch('http://localhost:4000/auth/validate-reset-token?token=' + encodeURIComponent(token))
+						.then(r => r.json())
+						.then(data => { if (data.valid) show('page-reset-b'); else show('page-reset-a'); })
+						.catch(() => show('page-reset-a'));
+				}
+			})
+			.catch(() => {});
+	}
+
 	</script>
-
-<!-- ══════════════ DESCRIBE YOU ══════════════ -->
-<div id="page-describe">
-	<div class="wm">
-		<svg class="mark-sm" viewBox="0 0 110 110" fill="none" xmlns="http://www.w3.org/2000/svg">
-			<g transform="translate(11,14) scale(0.92)">
-				<circle cx="34" cy="24" r="11" fill="#2563EB"/>
-				<rect x="28.5" y="24" width="11" height="50" rx="5.5" fill="#2563EB"/>
-				<circle cx="62" cy="38" r="8.5" fill="#60A5FA"/>
-				<rect x="57.75" y="38" width="8.5" height="36" rx="4.25" fill="#60A5FA"/>
-			</g>
-		</svg>
-		<span class="wm-name">LiveCollab</span>
-	</div>
-	<div class="desc-col">
-		<div class="desc-title">What best describes you?</div>
-		<div class="desc-sub">This helps us tailor <span style="color:#007ACC;font-weight:700">LiveCollab</span> to how you work.</div>
-		<div style="height:28px"></div>
-		<div class="desc-grid">
-			<div class="desc-card" data-type="student">
-				<span class="desc-check">✓</span>
-				
-				<div class="desc-card-title">Student</div>
-				<div class="desc-card-desc">Coursework, group projects, and learning to code</div>
-			</div>
-			<div class="desc-card" data-type="developer">
-				<span class="desc-check">✓</span>
-				
-				<div class="desc-card-title">Developer</div>
-				<div class="desc-card-desc">Professional or freelance coding</div>
-			</div>
-			<div class="desc-card" data-type="team">
-				<span class="desc-check">✓</span>
-				
-				<div class="desc-card-title">Team / Lead</div>
-				<div class="desc-card-desc">Building and shipping with a team</div>
-			</div>
-			<div class="desc-card" data-type="hobbyist">
-				<span class="desc-check">✓</span>
-				
-				<div class="desc-card-title">Hobbyist</div>
-				<div class="desc-card-desc">Side projects and exploring new ideas</div>
-			</div>
-		</div>
-		<div class="desc-skip" id="desc-skip">Skip</div>
-	</div>
-</div>
-
 </body>
 </html>

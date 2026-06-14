@@ -952,6 +952,23 @@ export class CodeApplication extends Disposable {
 	private async handleProtocolUrl(windowsMainService: IWindowsMainService, dialogMainService: IDialogMainService, urlService: IURLService, uri: URI, options?: IOpenURLOptions): Promise<boolean> {
 		this.logService.trace('app#handleProtocolUrl():', uri.toString(true), options);
 
+		// livecollab: handle reset-password deep link (livecollab://reset-password?token=...)
+		if (uri.scheme === this.productService.urlProtocol && uri.authority === 'reset-password') {
+			const resetParams = new URLSearchParams(uri.query);
+			const resetToken = resetParams.get('token');
+			if (resetToken) {
+				const windows = windowsMainService.getWindows();
+				if (windows.length > 0) {
+					// App already open — send token to bootstrap window
+					windows[0].sendWhenReady('vscode:livecollab-reset-token', CancellationToken.None, resetToken);
+				} else {
+					// App was closed — store token globally, bootstrap reads it on load
+					(global as any)._livecollabPendingResetToken = resetToken;
+				}
+			}
+			return true;
+		}
+
 		// Support 'workspace' URLs (https://github.com/microsoft/vscode/issues/124263)
 		if (uri.scheme === this.productService.urlProtocol && uri.path === 'workspace') {
 			uri = uri.with({
