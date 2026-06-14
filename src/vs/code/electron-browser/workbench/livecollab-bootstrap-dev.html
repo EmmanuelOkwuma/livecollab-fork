@@ -90,6 +90,13 @@
 		.desc-skip { font-size: 14px; color: #9D9D9D; cursor: pointer; padding: 8px 20px; border-radius: 6px; transition: color 120ms, background 120ms; }
 		.desc-skip:hover { color: #E4E4E4; background: #161616; }
 	
+			#si-stay-toggle.off { background: #3A3A3A; }
+		#si-stay-toggle.off #si-stay-knob { left: 19px; }
+		#si-stay-toggle:not(.off) #si-stay-knob { left: 3px; }
+			.pwd-wrap { position: relative; margin-bottom: 0; }
+		.pwd-wrap .auth-input { padding-right: 40px; margin-bottom: 0; }
+		.pwd-eye { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #6E6E6E; font-size: 16px; user-select: none; line-height: 1; }
+		.pwd-eye:hover { color: #9D9D9D; }
 	</style>
 </head>
 <body>
@@ -152,12 +159,19 @@
 				<div class="input-label">Email</div>
 				<input class="auth-input" type="email" placeholder="you@example.com" id="si-email"/>
 			</div>
-			<div class="input-group input-full" style="margin-bottom:14px">
-				<div class="input-label">Password</div>
-				<input class="auth-input" type="password" placeholder="••••••••" id="si-password"/>
+			<div class="input-label">Password</div>
+			<div class="pwd-wrap" style="margin-bottom:6px;"><input class="auth-input" type="password" placeholder="••••••••" id="si-password"/><span class="pwd-eye" onclick="togglePwd('si-password',this)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span></div>
+			<div style="text-align:right;margin-bottom:14px;">
+				<a id="go-forgot" style="font-size:12px;color:#3F8FD0;cursor:pointer;text-decoration:none;">Forgot password?</a>
 			</div>
-			<div class="continue-btn" id="si-continue" style="text-align:center">Continue</div>
-			<div id="si-error" style="color:#F14C4C;font-size:12px;text-align:center;margin-bottom:8px;display:none"></div>
+			<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+				<span style="font-size:12px;color:#9D9D9D;">Stay signed in on this device</span>
+				<div id="si-stay-toggle" onclick="this.classList.toggle('off')" style="width:36px;height:20px;border-radius:10px;background:#007ACC;cursor:pointer;position:relative;transition:background 200ms;flex-shrink:0;">
+					<div style="position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left 200ms;" id="si-stay-knob"></div>
+				</div>
+			</div>
+			<div id="si-error" style="color:#F14C4C;font-size:12px;margin-bottom:8px;display:none;"></div>
+			<div class="continue-btn" id="si-continue" style="text-align:center">Sign in</div>
 			<div class="switch">Don't have an account? <a id="go-signup-from-signin">Sign up</a></div>
 		</div>
 	</div>
@@ -194,21 +208,24 @@
 				Continue with Apple
 			</div>
 			<div class="divider">or</div>
-			<div class="input-row">
-				<div class="input-group">
-					<div class="input-label">First name</div>
-					<input class="auth-input" type="text" placeholder="First name" id="su-first"/>
-				</div>
-				<div class="input-group">
-					<div class="input-label">Last name</div>
-					<input class="auth-input" type="text" placeholder="Last name" id="su-last"/>
+			<div class="input-group input-full">
+				<div class="input-label">Email</div>
+				<input class="auth-input" type="email" placeholder="Your email address" id="su-email"/>
+			</div>
+			<div class="input-group input-full">
+				<div class="input-label">Password</div>
+				<div class="pwd-wrap"><input class="auth-input" type="password" placeholder="Create a password" id="su-password"/><span class="pwd-eye" onclick="togglePwd('su-password',this)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span></div>
+				<div id="su-checklist" style="display:none;margin-top:6px;margin-bottom:4px;flex-direction:column;gap:4px;">
+					<div id="su-chk-len" style="font-size:11px;color:#6E6E6E;">• At least 8 characters</div>
+					<div id="su-chk-num" style="font-size:11px;color:#6E6E6E;">• One number</div>
+					<div id="su-chk-upper" style="font-size:11px;color:#6E6E6E;">• One uppercase letter</div>
 				</div>
 			</div>
 			<div class="input-group input-full">
-				<div class="input-label">Email</div>
-				<input class="auth-input" type="email" placeholder="you@example.com" id="su-email"/>
+				<div class="input-label">Confirm password</div>
+				<div class="pwd-wrap"><input class="auth-input" type="password" placeholder="Re-enter password" id="su-confirm"/><span class="pwd-eye" onclick="togglePwd('su-confirm',this)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span></div>
 			</div>
-			<div class="continue-btn" id="su-continue">Continue</div>
+			<div class="continue-btn" id="su-continue">Create account</div>
 			<div class="switch">Already have an account? <a id="go-signin-from-signup">Sign in</a></div>
 		</div>
 	</div>
@@ -330,6 +347,40 @@
 		}
 	});
 
+
+	function togglePwd(id, eye) {
+		const inp = document.getElementById(id);
+		if (!inp) return;
+		const show = inp.type === 'password';
+		inp.type = show ? 'text' : 'password';
+		eye.style.color = show ? '#007ACC' : '#6E6E6E';
+		eye.innerHTML = show ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>' : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+	}
+
+	// Password checklist — shows on focus, hides when all met and user leaves
+	const suPwd = document.getElementById('su-password');
+	if (suPwd) {
+		const cl = document.getElementById('su-checklist');
+		function updateChecklist() {
+			const v = suPwd.value;
+			const lenOk = v.length >= 8, numOk = /[0-9]/.test(v), upOk = /[A-Z]/.test(v);
+			function setChk(id, ok) { const el = document.getElementById(id); if (!el) return; el.style.color = ok ? '#2EA043' : '#6E6E6E'; el.textContent = (ok ? '\u2713' : '\u2022') + ' ' + el.textContent.slice(2); }
+			setChk('su-chk-len', lenOk); setChk('su-chk-num', numOk); setChk('su-chk-upper', upOk);
+			return lenOk && numOk && upOk;
+		}
+		suPwd.addEventListener('focus', () => { if (cl) { cl.style.display = 'flex'; } });
+		suPwd.addEventListener('blur', () => { if (cl && updateChecklist()) cl.style.display = 'none'; });
+		suPwd.addEventListener('input', function() {
+			const v = this.value;
+			function setChk(id, ok) {
+				const el = document.getElementById(id);
+				if (!el) return;
+				el.style.color = ok ? '#2EA043' : '#6E6E6E';
+				el.textContent = (ok ? '\u2713' : '\u2022') + ' ' + el.textContent.slice(2);
+			}
+			updateChecklist();
+		});
+	}
 	</script>
 
 <!-- ══════════════ DESCRIBE YOU ══════════════ -->
