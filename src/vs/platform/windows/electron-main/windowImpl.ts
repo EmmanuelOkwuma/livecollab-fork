@@ -742,7 +742,43 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			(global as any)._livecollabPendingResetToken = undefined;
 			return resetToken;
 		});
-			electron.ipcMain.handle('vscode:livecollab-get-pending-token', (_event) => {
+			electron.ipcMain.handle('vscode:livecollab-start-auth', async (_event, clerkBaseUrl: string) => {
+			// Start a one-time localhost HTTP server to receive the Clerk OAuth callback
+			const http = await import('http');
+			return new Promise<number>((resolve) => {
+				const server = http.createServer((req, res) => {
+					const fullUrl = 'http://localhost' + req.url;
+					// Send callback URL to bootstrap window
+					if (this._win && !this._win.isDestroyed()) {
+						this._win.webContents.send('vscode:livecollab-clerk-session', fullUrl);
+					}
+					res.writeHead(200, { 'Content-Type': 'text/html' });
+					res.end('<html><body><h2 style="font-family:sans-serif;color:#181818;background:#181818;color:#CCCCCC;padding:40px">Signed in! You can close this window and return to LiveCollab.</h2></body></html>');
+					server.close();
+				});
+				server.listen(0, '127.0.0.1', () => {
+					const port = (server.address() as any).port;
+					// Open Clerk in browser with localhost callback
+					const redirectUrl = encodeURIComponent('http://127.0.0.1:' + port + '/clerk-callback');
+					electron.shell.openExternal(clerkBaseUrl + '?redirect_url=' + redirectUrl);
+					resolve(port);
+				});
+			});
+		});
+
+		electron.ipcMain.on('vscode:livecollab-open-browser', (_event, url: string) => {
+			// Open Clerk hosted auth page in the system browser
+			electron.shell.openExternal(url);
+		});
+
+		// Receive Clerk session URL after browser auth completes
+		electron.ipcMain.on('vscode:livecollab-clerk-session', (_event, sessionUrl: string) => {
+			if (this._win && !this._win.isDestroyed()) {
+				this._win.webContents.send('vscode:livecollab-clerk-session', sessionUrl);
+			}
+		});
+
+		electron.ipcMain.handle('vscode:livecollab-get-pending-token', (_event) => {
 				const token = _pendingToken;
 				_pendingToken = undefined;
 				return token;

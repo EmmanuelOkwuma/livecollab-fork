@@ -953,6 +953,17 @@ export class CodeApplication extends Disposable {
 		this.logService.trace('app#handleProtocolUrl():', uri.toString(true), options);
 
 		// livecollab: handle reset-password deep link (livecollab://reset-password?token=...)
+		if (uri.scheme === this.productService.urlProtocol && uri.authority === 'clerk-callback') {
+			// Clerk auth completed — extract session token and send to bootstrap window
+			const windows = windowsMainService.getWindows();
+			if (windows.length > 0) {
+				windows[0].sendWhenReady('vscode:livecollab-clerk-session', CancellationToken.None, uri.toString(true));
+			} else {
+				(global as any)._livecollabPendingClerkSession = uri.toString(true);
+			}
+			return true;
+		}
+
 		if (uri.scheme === this.productService.urlProtocol && uri.authority === 'reset-password') {
 			const resetParams = new URLSearchParams(uri.query);
 			const resetToken = resetParams.get('token');

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
-	<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src http://localhost:4000;">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src http://localhost:4000 https://fitting-mako-44.accounts.dev https://fitting-mako-44.clerk.accounts.dev;">
 	<title>LiveCollab</title>
 	<style>
 		* { margin: 0; padding: 0; box-sizing: border-box; }
@@ -75,6 +75,7 @@
 		.desc-continue:hover { background: #1177BB; }
 		.desc-continue:disabled { background: #2A2D34; color: #6E6E6E; cursor: not-allowed; }
 	</style>
+<script src="clerk.browser.js"></script>
 <script>
 	var PAGES = ['page-landing','page-signin','page-signup','page-displayname','page-describe','page-reset-a','page-reset-b'];
 	function show(id) {
@@ -250,31 +251,16 @@
 	}
 
 	// Navigation
-	document.getElementById('go-signin').onclick = function() { show('page-signin'); };
-	document.getElementById('go-signup').onclick = function() { show('page-signup'); };
+	document.getElementById('go-signin').onclick = function() { if (window.vscode && window.vscode.ipcRenderer) window.vscode.ipcRenderer.invoke('vscode:livecollab-start-auth', 'https://fitting-mako-44.accounts.dev/sign-in'); };
+	document.getElementById('go-signup').onclick = function() { if (window.vscode && window.vscode.ipcRenderer) window.vscode.ipcRenderer.invoke('vscode:livecollab-start-auth', 'https://fitting-mako-44.accounts.dev/sign-up'); };
 	document.getElementById('go-signup-from-signin').onclick = function() { show('page-signup'); };
 	document.getElementById('go-signin-from-signup').onclick = function() { show('page-signin'); };
 	document.getElementById('go-forgot').onclick = function() { show('page-reset-a'); };
 	document.getElementById('si-google').onclick = function() { show('page-displayname'); };
 	document.getElementById('su-google').onclick = function() { show('page-displayname'); };
 
-	// Sign In
-	document.getElementById('si-submit').onclick = async function() {
-		var email = document.getElementById('si-email').value.trim();
-		var pwd = document.getElementById('si-password').value;
-		var err = document.getElementById('si-error');
-		err.style.display = 'none';
-		if (!email || !pwd) { err.textContent = 'Please enter your email and password.'; err.style.display = 'block'; return; }
-		this.textContent = 'Signing in...';
-		try {
-			var res = await fetch('http://localhost:4000/auth/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({email: email, password: pwd}) });
-			var text = await res.text();
-			if (!res.ok) { err.textContent = text === 'invalid_credentials' ? 'Incorrect email or password.' : 'Something went wrong.'; err.style.display = 'block'; this.textContent = 'Sign in'; return; }
-			var data = JSON.parse(text);
-			if (window.vscode && window.vscode.ipcRenderer) window.vscode.ipcRenderer.send('vscode:livecollab-store-token', data.token);
-			loadWorkbench();
-		} catch(e) { err.textContent = 'Could not reach the server. Is it running?'; err.style.display = 'block'; this.textContent = 'Sign in'; }
-	};
+	// Sign In — Clerk browser handoff
+	document.getElementById('si-submit').onclick = function() { if (window.vscode && window.vscode.ipcRenderer) window.vscode.ipcRenderer.invoke('vscode:livecollab-start-auth', 'https://fitting-mako-44.accounts.dev/sign-in'); };
 
 	// Sign Up checklist
 	var suPwd = document.getElementById('su-password');
@@ -290,26 +276,8 @@
 	suPwd.addEventListener('blur', function() { if (updateSuChecklist()) suCl.style.display = 'none'; });
 	suPwd.addEventListener('input', updateSuChecklist);
 
-	// Sign Up submit
-	document.getElementById('su-submit').onclick = async function() {
-		var email = document.getElementById('su-email').value.trim();
-		var pwd = document.getElementById('su-password').value;
-		var confirm = document.getElementById('su-confirm').value;
-		var err = document.getElementById('su-error');
-		err.style.display = 'none';
-		if (!email || !pwd) { err.textContent = 'Please fill in all fields.'; err.style.display = 'block'; return; }
-		if (!updateSuChecklist()) { err.textContent = 'Password does not meet requirements.'; err.style.display = 'block'; return; }
-		if (pwd !== confirm) { err.textContent = 'Passwords do not match.'; err.style.display = 'block'; return; }
-		this.textContent = 'Creating account...';
-		try {
-			var res = await fetch('http://localhost:4000/auth/register', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({email: email, password: pwd}) });
-			var text = await res.text();
-			if (!res.ok) { err.textContent = text === 'user_exists' ? 'An account with this email already exists.' : 'Something went wrong.'; err.style.display = 'block'; this.textContent = 'Create account'; return; }
-			var data = JSON.parse(text);
-			if (window.vscode && window.vscode.ipcRenderer) window.vscode.ipcRenderer.send('vscode:livecollab-store-token', data.token);
-			show('page-displayname');
-		} catch(e) { err.textContent = 'Could not reach the server. Is it running?'; err.style.display = 'block'; this.textContent = 'Create account'; }
-	};
+	// Sign Up — Clerk browser handoff
+	document.getElementById('su-submit').onclick = function() { if (window.vscode && window.vscode.ipcRenderer) window.vscode.ipcRenderer.invoke('vscode:livecollab-start-auth', 'https://fitting-mako-44.accounts.dev/sign-up'); };
 
 	// Display name
 	document.getElementById('display-name-continue').onclick = function() {
@@ -420,6 +388,24 @@
 					.catch(function() { show('page-reset-a'); });
 			}).catch(function() {});
 	}, 1000);
+	}
+
+	// Listen for Clerk session return from browser
+	if (window.vscode && window.vscode.ipcRenderer) {
+		window.vscode.ipcRenderer.on('vscode:livecollab-clerk-session', function(_e, sessionUrl) {
+			// Clerk auth completed — store session and proceed
+			console.log('[LiveCollab] Clerk session received:', sessionUrl);
+			// Parse token from URL if present
+			var url = new URL(sessionUrl);
+			var token = url.searchParams.get('__clerk_ticket') || url.searchParams.get('token');
+			if (token && window.vscode.ipcRenderer) {
+				window.vscode.ipcRenderer.send('vscode:livecollab-store-token', token);
+			} else {
+				// No token in URL — session is established via Clerk cookies
+				// Proceed to onboarding
+				show('page-displayname');
+			}
+		});
 	}
 
 	function loadWorkbench() {
