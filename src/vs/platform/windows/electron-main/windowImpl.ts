@@ -753,7 +753,7 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 						this._win.webContents.send('vscode:livecollab-clerk-session', fullUrl);
 					}
 					res.writeHead(200, { 'Content-Type': 'text/html' });
-					res.end('<html><body><h2 style="font-family:sans-serif;color:#181818;background:#181818;color:#CCCCCC;padding:40px">Signed in! You can close this window and return to LiveCollab.</h2></body></html>');
+					res.end(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>LiveCollab</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{background:#181818;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px;}h2{color:#F2F2F2;font-size:24px;font-weight:600;}p{color:#9D9D9D;font-size:14px;}span{color:#007ACC;font-weight:700;}</style></head><body><h2>You're signed in.</h2><p>Return to <span>LiveCollab</span> to continue.</p><p style="margin-top:8px;font-size:12px;color:#6E6E6E;">You can close this window.</p></body></html>`);
 					server.close();
 				});
 				server.listen(0, '127.0.0.1', () => {
