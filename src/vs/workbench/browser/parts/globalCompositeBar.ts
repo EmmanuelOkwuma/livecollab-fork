@@ -6,6 +6,8 @@
 import { localize } from '../../../nls.js';
 import { ActionBar, ActionsOrientation } from '../../../base/browser/ui/actionbar/actionbar.js';
 import { ACCOUNTS_ACTIVITY_ID, GLOBAL_ACTIVITY_ID } from '../../common/activity.js';
+const LIVECOLLAB_DASHBOARD_ACTIVITY_ID = 'livecollab.dashboard.activity';
+
 import { IActivityService } from '../../services/activity/common/activity.js';
 import { IInstantiationService } from '../../../platform/instantiation/common/instantiation.js';
 import { DisposableStore, Disposable } from '../../../base/common/lifecycle.js';
@@ -45,13 +47,40 @@ import { ACTIVITY_BAR_BADGE_BACKGROUND, ACTIVITY_BAR_BADGE_FOREGROUND } from '..
 import { IBaseActionViewItemOptions } from '../../../base/browser/ui/actionbar/actionViewItems.js';
 import { ICommandService } from '../../../platform/commands/common/commands.js';
 
+export class LiveCollabDashboardActionViewItem extends CompositeBarActionViewItem {
+	constructor(
+		action: CompositeBarAction,
+		options: ICompositeBarActionViewItemOptions,
+		@IThemeService themeService: IThemeService,
+		@IHoverService hoverService: IHoverService,
+		@IConfigurationService configurationService: IConfigurationService,
+		@IKeybindingService keybindingService: IKeybindingService,
+	) {
+		super(action, { ...options, icon: true }, () => false, themeService, hoverService, configurationService, keybindingService);
+	}
+
+	override render(container: HTMLElement): void {
+		super.render(container);
+		// Wire click to go back to dashboard
+		if (this.container) {
+			this.container.onclick = () => {
+				const ipc = (window as any).vscode?.ipcRenderer;
+				if (ipc) { ipc.send('vscode:livecollab-load-dashboard'); }
+			};
+			this.container.style.cursor = 'pointer';
+		}
+	}
+}
+
 export class GlobalCompositeBar extends Disposable {
 
-	private static readonly ACCOUNTS_ACTION_INDEX = 0;
+	private static readonly LIVECOLLAB_DASHBOARD_INDEX = 0;
+	private static readonly ACCOUNTS_ACTION_INDEX = 1;
 	static readonly ACCOUNTS_ICON = registerIcon('accounts-view-bar-icon', Codicon.account, localize('accountsViewBarIcon', "Accounts icon in the view bar."));
 
 	readonly element: HTMLElement;
 
+	private readonly livecollabDashboardAction = this._register(new CompositeBarAction({ id: LIVECOLLAB_DASHBOARD_ACTIVITY_ID, name: 'LiveCollab Dashboard', classNames: ['codicon', 'codicon-layout-panel-justify'] }));
 	private readonly globalActivityAction = this._register(new Action(GLOBAL_ACTIVITY_ID));
 	private readonly accountAction = this._register(new Action(ACCOUNTS_ACTIVITY_ID));
 	private readonly globalActivityActionBar: ActionBar;
@@ -95,6 +124,10 @@ export class GlobalCompositeBar extends Disposable {
 						});
 				}
 
+				if (action.id === LIVECOLLAB_DASHBOARD_ACTIVITY_ID) {
+					return instantiationService.createInstance(LiveCollabDashboardActionViewItem, action as CompositeBarAction, { ...options, colors: this.colors, hoverOptions: this.activityHoverOptions });
+				}
+
 				throw new Error(`No view item for action '${action.id}'`);
 			},
 			orientation: ActionsOrientation.VERTICAL,
@@ -106,6 +139,7 @@ export class GlobalCompositeBar extends Disposable {
 			this.globalActivityActionBar.push(this.accountAction, { index: GlobalCompositeBar.ACCOUNTS_ACTION_INDEX });
 		}
 
+		this.globalActivityActionBar.push(this.livecollabDashboardAction, { index: GlobalCompositeBar.LIVECOLLAB_DASHBOARD_INDEX });
 		this.globalActivityActionBar.push(this.globalActivityAction);
 
 		this.registerListeners();

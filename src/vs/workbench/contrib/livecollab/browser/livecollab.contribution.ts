@@ -24,11 +24,11 @@ import { LiveCollabSignInInput } from './livecollabSignInInput.js';
 import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
 import './livecollabEditorContribution.js';
 import { LiveCollabFolderContribution } from './livecollabFolderContribution.js';
+import { LiveCollabDashboardOverlay } from './livecollabDashboardOverlay.js';
 import './livecollabCursorContribution.js';
 import { IRequestService } from '../../../../platform/request/common/request.js';
 import { IWorkbenchContribution } from '../../../common/contributions.js';
 import { Disposable } from '../../../../base/common/lifecycle.js';
-import { ISecretStorageService } from '../../../../platform/secrets/common/secrets.js';
 
 // Bootstrap contribution — runs at startup to wire IRequestService into livecollabService
 class LiveCollabBootstrap extends Disposable implements IWorkbenchContribution {
@@ -114,6 +114,12 @@ Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).regi
 	LiveCollabStatusBarContribution,
 	LifecyclePhase.Restored
 );
+
+// Back to Dashboard command
+CommandsRegistry.registerCommand('livecollab.backToDashboard', async () => {
+	const ipc = (window as any).vscode?.ipcRenderer;
+	if (ipc) { ipc.send('vscode:livecollab-load-dashboard'); }
+});
 
 // Join Session command
 CommandsRegistry.registerCommand('livecollab.joinSession', async (accessor) => {
@@ -206,35 +212,54 @@ Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).regi
 
 class LiveCollabStartupOwner extends Disposable implements IWorkbenchContribution {
 	static readonly ID = 'workbench.contrib.livecollabStartupOwner';
-	constructor(
-		@ISecretStorageService private readonly secretStorageService: ISecretStorageService,
-	) {
+	constructor() {
 		super();
 		this._boot();
 	}
 
 	private async _boot(): Promise<void> {
 		try {
-			const token = await (window as any).vscode?.ipcRenderer?.invoke('vscode:livecollab-get-pending-token') as string | undefined;
-			if (token) {
-				// Store in OS keychain — same key the rest of the app reads
-				await this.secretStorageService.set('livecollab.token', token);
-				console.log('[LiveCollab] token received from bootstrap and stored in keychain');
-			}
-			// Now read token (either just stored or pre-existing) and connect
-			const stored = await this.secretStorageService.get('livecollab.token');
-			if (stored) {
-				livecollabService.setToken(stored);
-				await livecollabService.connect();
-				console.log('[LiveCollab] connected with stored token');
+			// Mint a real Clerk session JWT for the socket
+			const ipc = (window as any).vscode?.ipcRenderer;
+			if (!ipc) { return; }
+			const dvbJwt = (() => { try { return localStorage.getItem('__clerk_db_jwt') || ''; } catch { return ''; } })();
+			if (!dvbJwt) { console.log('[LiveCollab] no Clerk session found'); return; }
+			const clerkJwt = await ipc.invoke('vscode:livecollab-mint-token', dvbJwt) as string | null;
+			if (!clerkJwt) { console.log('[LiveCollab] could not mint Clerk token'); return; }
+			const displayName = (window as any)._dashDisplayName || (window as any)._dashFullName || 'User';
+			livecollabService.setToken(clerkJwt);
+			(livecollabService as any)._displayName = displayName;
+			const roomId = await ipc.invoke('vscode:livecollab-get-pending-roomid') as string | null;
+			await livecollabService.connect();
+			console.log('[LiveCollab] workbench connected with Clerk token');
+			// Wait for socket to actually be connected before joining
+			await new Promise<void>(resolve => {
+				if (livecollabService.isConnected) { resolve(); return; }
+				const d = livecollabService.onConnected(() => { d.dispose(); resolve(); });
+				setTimeout(resolve, 3000); // safety timeout
+			});
+			if (roomId) {
+				await livecollabService.joinExistingRoom(roomId);
+				console.log('[LiveCollab] joined room:', roomId);
+				// Get room name passed from dashboard via IPC
+				try {
+					const roomName = await ipc.invoke('vscode:livecollab-get-pending-roomname') as string | null;
+					if (roomName) { (livecollabService as any)._roomName = roomName; }
+				} catch {}
+				setTimeout(() => livecollabService.fetchMembers(roomId), 500);
 			}
 		} catch (e) {
-			console.error('[LiveCollab] startup owner error:', e);
+			console.error('[LiveCollab] startup error:', e);
 		}
 	}
 }
 
 Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).registerWorkbenchContribution(
 	LiveCollabStartupOwner,
+	LifecyclePhase.Restored
+);
+
+Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).registerWorkbenchContribution(
+	LiveCollabDashboardOverlay,
 	LifecyclePhase.Restored
 );

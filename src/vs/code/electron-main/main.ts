@@ -96,6 +96,26 @@ class CodeMain {
 
 	private async startup(): Promise<void> {
 
+		// Load .env.local into process.env (LiveCollab — Clerk secret, etc.)
+		try {
+			const fs = await import('fs');
+			const path = await import('path');
+			const envPath = path.join(process.cwd(), '.env.local');
+			if (fs.existsSync(envPath)) {
+				const lines = fs.readFileSync(envPath, 'utf8').split('\n');
+				for (const line of lines) {
+					const trimmed = line.trim();
+					if (!trimmed || trimmed.startsWith('#')) { continue; }
+					const eq = trimmed.indexOf('=');
+					if (eq === -1) { continue; }
+					const key = trimmed.slice(0, eq).trim();
+					let val = trimmed.slice(eq + 1).trim();
+					if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) { val = val.slice(1, -1); }
+					if (key && !process.env[key]) { process.env[key] = val; }
+				}
+			}
+		} catch (e) { /* env load best-effort */ }
+
 		// Set the error handler early enough so that we are not getting the
 		// default electron error dialog popping up
 		setUnexpectedErrorHandler(err => console.error(err));

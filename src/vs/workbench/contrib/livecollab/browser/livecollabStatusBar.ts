@@ -7,12 +7,14 @@ import { localize } from '../../../../nls.js';
 import { IWorkbenchContribution } from '../../../common/contributions.js';
 import { IStatusbarService, StatusbarAlignment, IStatusbarEntry, IStatusbarEntryAccessor } from '../../../services/statusbar/browser/statusbar.js';
 import { Disposable } from '../../../../base/common/lifecycle.js';
+import { livecollabService } from './livecollabService.js';
 
 export class LiveCollabStatusBarContribution extends Disposable implements IWorkbenchContribution {
 
 	static readonly ID = 'workbench.contrib.livecollabStatusBar';
 
 	private statusBarEntry: IStatusbarEntryAccessor | undefined;
+	private roomEntry: IStatusbarEntryAccessor | undefined;
 	private pulseInterval: ReturnType<typeof setInterval> | undefined;
 	private pulseState = true;
 
@@ -20,9 +22,14 @@ export class LiveCollabStatusBarContribution extends Disposable implements IWork
 		@IStatusbarService private readonly statusbarService: IStatusbarService,
 	) {
 		super();
+		// Self-wire: update status bar whenever members change
+		this._register(livecollabService.onMembersChanged((members) => {
+			this.updateSession(members.length, livecollabService.roomName, livecollabService.roomId);
+		}));
+
 	}
 
-	updateSession(memberCount: number): void {
+	updateSession(memberCount: number, roomName?: string, _roomId?: string): void {
 		if (memberCount > 0) {
 			if (!this.statusBarEntry) {
 				const entry: IStatusbarEntry = {
@@ -47,6 +54,29 @@ export class LiveCollabStatusBarContribution extends Disposable implements IWork
 				});
 			}
 
+			// Left side: room name · short ID (no labels, clean)
+			if (roomName) { // only show when room name is available
+				const roomText = roomName || '';
+				if (!this.roomEntry) {
+					this.roomEntry = this._register(
+						this.statusbarService.addEntry({
+							name: 'LiveCollab Room',
+							text: roomText,
+							tooltip: roomName || '',
+							ariaLabel: 'LiveCollab: ' + roomText,
+							command: undefined,
+						}, 'livecollab.room', StatusbarAlignment.LEFT, 999)
+					);
+				} else {
+					this.roomEntry.update({
+						name: 'LiveCollab Room',
+						text: roomText,
+						tooltip: roomName || '',
+						ariaLabel: 'LiveCollab: ' + roomText,
+						command: undefined,
+					});
+				}
+			}
 			if (!this.pulseInterval) {
 				this.pulseInterval = setInterval(() => {
 					if (!this.statusBarEntry) { return; }

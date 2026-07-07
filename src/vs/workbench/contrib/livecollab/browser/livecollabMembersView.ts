@@ -111,23 +111,8 @@ export class LiveCollabMembersView extends ViewPane {
 		this.roomIdText.textContent = livecollabService.roomId ? livecollabService.roomId.slice(0, 8) : '—';
 		roomIdRow.appendChild(this.roomIdText);
 
-		const copyRoomIdBtn = document.createElement('button');
-		copyRoomIdBtn.style.background = 'transparent';
-		copyRoomIdBtn.style.border = 'none';
-		copyRoomIdBtn.style.color = '#858585';
-		copyRoomIdBtn.style.cursor = 'pointer';
-		copyRoomIdBtn.style.fontSize = '11px';
-		copyRoomIdBtn.style.padding = '4px 8px';
-		copyRoomIdBtn.style.borderRadius = '3px';
-		copyRoomIdBtn.textContent = 'Copy';
-		copyRoomIdBtn.onmouseenter = () => { copyRoomIdBtn.style.color = '#cccccc'; };
-		copyRoomIdBtn.onmouseleave = () => { copyRoomIdBtn.style.color = '#858585'; };
-		copyRoomIdBtn.onclick = () => {
-			if (livecollabService.roomId) {
-				this.clipboardService.writeText(livecollabService.roomId || '');
-			}
-		};
-		roomIdRow.appendChild(copyRoomIdBtn);
+// Copy button removed
+		
 		roomIdSection.appendChild(roomIdRow);
 		container.appendChild(roomIdSection);
 
@@ -192,6 +177,14 @@ export class LiveCollabMembersView extends ViewPane {
 		this.membersContainer.style.padding = '4px 0';
 		container.appendChild(this.membersContainer);
 
+		// Populate immediately from cached members on render
+		if (livecollabService.lastMembers.length > 0) {
+			this.members = livecollabService.lastMembers;
+		}
+		// Re-request fresh members list from server
+		if (livecollabService.isConnected && livecollabService.roomId) {
+			livecollabService.fetchMembers(livecollabService.roomId);
+		}
 		this.updateMembersList();
 	}
 
@@ -217,99 +210,98 @@ export class LiveCollabMembersView extends ViewPane {
 			return;
 		}
 
-		this.members.forEach((member, index) => {
-			const row = document.createElement('div');
-			row.style.display = 'flex';
-			row.style.alignItems = 'center';
-			row.style.justifyContent = 'space-between';
-			row.style.padding = '4px 8px';
-			row.style.borderRadius = '4px';
-			row.style.cursor = 'default';
+					const myUserId = livecollabService.myUserId;
+			const myRole = this.members.find(m => m.userId === myUserId)?.role;
+			const iAmOwner = myRole === 'owner';
 
-			const left = document.createElement('div');
-			left.style.display = 'flex';
-			left.style.alignItems = 'center';
-			left.style.gap = '8px';
-			left.style.minWidth = '0';
-			left.style.flex = '1';
+			this.members.forEach((member, index) => {
+				const isMe = member.userId === myUserId;
+				const row = document.createElement('div');
+				row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:4px 8px;border-radius:4px;cursor:default;';
 
-			const color = colorForIndex(index);
-			const avatar = document.createElement('div');
-			avatar.style.width = '22px';
-			avatar.style.height = '22px';
-			avatar.style.borderRadius = '50%';
-			avatar.style.background = color + '33';
-			avatar.style.border = '1px solid ' + color + '66';
-			avatar.style.backdropFilter = 'blur(4px)';
-			avatar.style.display = 'flex';
-			avatar.style.alignItems = 'center';
-			avatar.style.justifyContent = 'center';
-			avatar.style.fontSize = '11px';
-			avatar.style.fontWeight = '600';
-			avatar.style.color = color;
-			avatar.style.flexShrink = '0';
-			avatar.textContent = initialsFromName(member.name || member.email || 'U');
-			left.appendChild(avatar);
+				const left = document.createElement('div');
+				left.style.cssText = 'display:flex;align-items:center;gap:8px;min-width:0;flex:1;';
 
-			const info = document.createElement('div');
-			info.style.minWidth = '0';
+				const color = colorForIndex(index);
+				const avatar = document.createElement('div');
+				avatar.style.cssText = `width:22px;height:22px;border-radius:50%;background:${color}33;border:1px solid ${color}66;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:${color};flex-shrink:0;`;
+				const displayName = (member as any).displayName || member.name || member.email || 'User';
+				avatar.textContent = initialsFromName(displayName);
+				left.appendChild(avatar);
 
-			const nameEl = document.createElement('div');
-			nameEl.style.fontSize = '12px';
-			nameEl.style.color = '#cccccc';
-			nameEl.style.overflow = 'hidden';
-			nameEl.style.textOverflow = 'ellipsis';
-			nameEl.style.whiteSpace = 'nowrap';
-			nameEl.textContent = member.name || member.email || 'Unknown';
-			info.appendChild(nameEl);
+				const info = document.createElement('div');
+				info.style.minWidth = '0';
 
-			const roleEl = document.createElement('div');
-			roleEl.style.fontSize = '11px';
-			roleEl.style.color = '#858585';
-			roleEl.textContent = member.role;
-			info.appendChild(roleEl);
+				const nameEl = document.createElement('div');
+				nameEl.style.cssText = 'font-size:12px;color:#cccccc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+				nameEl.textContent = displayName + (isMe ? ' (you)' : '');
+				info.appendChild(nameEl);
 
-			left.appendChild(info);
-			row.appendChild(left);
+				const roleEl = document.createElement('div');
+				roleEl.style.cssText = 'font-size:11px;color:#858585;';
+				const roleLabel = member.role.charAt(0).toUpperCase() + member.role.slice(1);
+				roleEl.textContent = roleLabel;
+				info.appendChild(roleEl);
 
-			if (member.role !== 'owner') {
+				left.appendChild(info);
+				row.appendChild(left);
+
 				const actions = document.createElement('div');
-				actions.style.display = 'none';
-				actions.style.gap = '4px';
-				actions.style.flexShrink = '0';
+				actions.style.cssText = 'display:none;gap:4px;flex-shrink:0;align-items:center;';
 
-				const makeBtn = (label: string) => {
+				const makeBtn = (label: string, btnColor: string = '#858585', hoverColor: string = '#cccccc') => {
 					const btn = document.createElement('button');
 					btn.textContent = label;
-					btn.style.background = 'transparent';
-					btn.style.border = '1px solid #2b2b2b';
-					btn.style.color = '#858585';
-					btn.style.borderRadius = '3px';
-					btn.style.padding = '2px 6px';
-					btn.style.fontSize = '10px';
-					btn.style.cursor = 'pointer';
-					btn.onmouseenter = () => { btn.style.borderColor = '#007ACC'; btn.style.color = '#cccccc'; };
-					btn.onmouseleave = () => { btn.style.borderColor = '#2b2b2b'; btn.style.color = '#858585'; };
+					btn.style.cssText = `background:transparent;border:1px solid #2b2b2b;color:${btnColor};border-radius:3px;padding:2px 6px;font-size:10px;cursor:pointer;`;
+					btn.onmouseenter = () => { btn.style.borderColor = '#007ACC'; btn.style.color = hoverColor; };
+					btn.onmouseleave = () => { btn.style.borderColor = '#2b2b2b'; btn.style.color = btnColor; };
 					return btn;
 				};
 
-				if (member.role === 'viewer') { actions.appendChild(makeBtn('Editor')); }
-				if (member.role === 'editor') { actions.appendChild(makeBtn('Viewer')); }
-				actions.appendChild(makeBtn('Owner'));
+				if (isMe && member.role !== 'owner') {
+					const leaveBtn = document.createElement('button');
+					leaveBtn.title = 'Leave room';
+					leaveBtn.style.cssText = 'background:transparent;border:none;cursor:pointer;color:#858585;padding:2px 4px;display:flex;align-items:center;border-radius:3px;';
+					const ns = 'http://www.w3.org/2000/svg';
+					const svg = document.createElementNS(ns,'svg');
+					svg.setAttribute('viewBox','0 0 16 16'); svg.setAttribute('width','14'); svg.setAttribute('height','14');
+					svg.setAttribute('fill','none'); svg.setAttribute('stroke','currentColor'); svg.setAttribute('stroke-width','1.3');
+					const door = document.createElementNS(ns,'path');
+					door.setAttribute('d','M10 2H3a1 1 0 00-1 1v10a1 1 0 001 1h7');
+					const arrow = document.createElementNS(ns,'path');
+					arrow.setAttribute('d','M7 8h7m-3-3l3 3-3 3');
+					svg.appendChild(door); svg.appendChild(arrow);
+					leaveBtn.appendChild(svg);
+					leaveBtn.onmouseenter = () => { leaveBtn.style.color = '#F14C4C'; };
+					leaveBtn.onmouseleave = () => { leaveBtn.style.color = '#858585'; };
+					leaveBtn.onclick = () => { livecollabService.leaveRoom(); };
+					actions.appendChild(leaveBtn);
+				} else if (!isMe && iAmOwner && member.role !== 'owner') {
+					const roleToggle = makeBtn(member.role === 'viewer' ? 'Editor' : 'Viewer');
+					roleToggle.onclick = () => { livecollabService.setMemberRole(member.userId, member.role === 'viewer' ? 'editor' : 'viewer'); };
+					const kickBtn = makeBtn('Kick', '#c75050', '#F14C4C');
+					kickBtn.onclick = () => { livecollabService.kickMember(member.userId); };
+					const ownerBtn = makeBtn('Owner');
+					ownerBtn.onclick = () => { livecollabService.transferOwnership(member.userId); };
+					actions.appendChild(roleToggle);
+					actions.appendChild(kickBtn);
+					actions.appendChild(ownerBtn);
+				}
 
-				row.onmouseenter = () => { row.style.background = '#2a2d2e'; actions.style.display = 'flex'; };
-				row.onmouseleave = () => { row.style.background = 'transparent'; actions.style.display = 'none'; };
-				row.appendChild(actions);
-			} else {
-				row.onmouseenter = () => { row.style.background = '#2a2d2e'; };
-				row.onmouseleave = () => { row.style.background = 'transparent'; };
-			}
+				if (actions.children.length > 0) {
+					row.onmouseenter = () => { row.style.background = '#2a2d2e'; actions.style.display = 'flex'; };
+					row.onmouseleave = () => { row.style.background = 'transparent'; actions.style.display = 'none'; };
+					row.appendChild(actions);
+				} else {
+					row.onmouseenter = () => { row.style.background = '#2a2d2e'; };
+					row.onmouseleave = () => { row.style.background = 'transparent'; };
+				}
 
-			this.membersContainer!.appendChild(row);
-		});
-	}
+				this.membersContainer!.appendChild(row);
+			});
+		}
 
-	protected override layoutBody(height: number, width: number): void {
+		protected override layoutBody(height: number, width: number): void {
 		super.layoutBody(height, width);
 	}
 }

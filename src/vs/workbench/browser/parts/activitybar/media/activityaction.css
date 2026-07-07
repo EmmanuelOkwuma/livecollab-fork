@@ -228,3 +228,12 @@
 	left: auto;
 	right: 0;
 }
+
+/* LiveCollab Dashboard button */
+.monaco-workbench .activitybar .livecollab-dashboard-btn svg {
+	display: block;
+	width: 20px;
+	height: 20px;
+	stroke: var(--vscode-activityBar-foreground, rgba(255,255,255,0.6));
+	fill: none;
+}

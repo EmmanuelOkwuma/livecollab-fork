@@ -32,6 +32,7 @@ export class LiveCollabService extends Disposable {
 	private _roomId: string | undefined;
 	private _roomName: string | undefined;
 	private _displayName: string = 'User';
+	private _myUserId: string = '';
 	private _lastMembers: ILiveCollabMember[] = [];
 	private _fileCache: Map<string, string> = new Map();
 	private _connecting = false;
@@ -64,6 +65,9 @@ export class LiveCollabService extends Disposable {
 	readonly onFileContentRequest: Event<{ path: string; ack: any }> = this._onFileContentRequest.event;
 
 	private readonly _onMemberJoined = this._register(new Emitter<void>());
+
+	private readonly _onRoomLeft = this._register(new Emitter<void>());
+	readonly onRoomLeft: Event<void> = this._onRoomLeft.event;
 	readonly onMemberJoined: Event<void> = this._onMemberJoined.event;
 
 	private readonly _onFileTree = this._register(new Emitter<{ tree: any[], roomName: string }>());
@@ -75,6 +79,7 @@ export class LiveCollabService extends Disposable {
 	get isConnected(): boolean { return this.socket?.connected ?? false; }
 	get roomId(): string | undefined { return this._roomId; }
 	get roomName(): string | undefined { return this._roomName; }
+	get myUserId(): string { return this._myUserId; }
 	private _myRole: string | undefined;
 	get myRole(): string | undefined { return this._myRole; }
 	setRoomContext(name: string | undefined, role: string | undefined): void {
@@ -91,6 +96,7 @@ export class LiveCollabService extends Disposable {
 			if (parts.length === 3) {
 				const payload = JSON.parse(atob(parts[1]));
 				this._displayName = payload.email ? payload.email.split('@')[0] : 'User';
+				if (payload.sub) { this._myUserId = payload.sub; }
 			}
 		} catch { }
 	}
@@ -156,7 +162,7 @@ export class LiveCollabService extends Disposable {
 		if (!this.socket?.connected) { return; }
 		this._roomId = roomId;
 		return new Promise((resolve) => {
-			this.socket.emit('room:join', { roomId, displayName: this._displayName, colorIndex: 0 }, () => { resolve(); });
+			this.socket.emit('room:join', { roomId, displayName: this._displayName, colorIndex: 0 }, (res: any) => { if (res?.userId) { this._myUserId = res.userId; } resolve(); });
 		});
 	}
 
@@ -186,6 +192,16 @@ export class LiveCollabService extends Disposable {
 			});
 		});
 	}
+	async fetchMembers(roomId: string): Promise<void> {
+		if (!this.socket?.connected) { return; }
+		this.socket.emit('room:members:get', { roomId }, (res: any) => {
+			if (res && Array.isArray(res.members)) {
+				this._lastMembers = res.members;
+				this._onMembersChanged.fire(res.members);
+			}
+		});
+	}
+
 	async joinByCode(code: string): Promise<{ ok: boolean; roomId?: string; error?: string }> {
 		if (!this.socket?.connected) { return { ok: false, error: 'not_connected' }; }
 		return new Promise((resolve) => {
@@ -222,6 +238,35 @@ export class LiveCollabService extends Disposable {
 	sendMessage(roomId: string, content: string): void {
 		if (!this.socket?.connected) { return; }
 		this.socket.emit('chat:send', { roomId, text: content, name: this._displayName });
+	}
+
+	leaveRoom(): void {
+		if (!this.socket?.connected || !this._roomId) { return; }
+		this.socket.emit('room:leave', { roomId: this._roomId });
+		this._roomId = undefined;
+		this._roomName = undefined;
+		this._lastMembers = [];
+		this._onMembersChanged.fire([]);
+		// Fire onRoomLeft so contributions can tear down (spec 6B)
+		this._onRoomLeft.fire();
+		// Navigate back to dashboard
+		const ipc = (window as any).vscode?.ipcRenderer;
+		if (ipc) { ipc.send('vscode:livecollab-load-dashboard'); }
+	}
+
+	kickMember(userId: string): void {
+		if (!this.socket?.connected || !this._roomId) { return; }
+		this.socket.emit('room:kick', { roomId: this._roomId, userId });
+	}
+
+	setMemberRole(userId: string, role: 'editor' | 'viewer'): void {
+		if (!this.socket?.connected || !this._roomId) { return; }
+		this.socket.emit('room:role:set', { roomId: this._roomId, userId, role });
+	}
+
+	transferOwnership(userId: string): void {
+		if (!this.socket?.connected || !this._roomId) { return; }
+		this.socket.emit('room:owner:transfer', { roomId: this._roomId, userId });
 	}
 
 	async createInviteCode(): Promise<{ success: boolean; code?: string; error?: string }> {

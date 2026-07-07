@@ -30,6 +30,14 @@ export class LiveCollabFileSystemProvider extends InMemoryFileSystemProvider {
 		this._roomId = roomId;
 	}
 
+	clear(): void {
+		// Wipe all in-memory files so the next room loads clean (spec 6B)
+		this._pendingRequests.clear();
+		this._roomId = '';
+		try { (this as any)._files = new Map(); } catch {}
+		try { (this as any).files = new Map(); } catch {}
+	}
+
 	async populateFromTree(tree: any[], basePath: string = ''): Promise<void> {
 		for (const item of tree) {
 			const itemPath = basePath ? `${basePath}/${item.name}` : item.name;

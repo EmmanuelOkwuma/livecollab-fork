@@ -210,16 +210,7 @@ export const startEntries: GettingStartedStartEntryContent = [
 			command: 'command:welcome.newWorkspaceChat',
 		}
 	},
-        {
-                id: 'livecollab.joinSession',
-                title: localize('livecollab.joinSession.title', "Join Session..."),
-                description: localize('livecollab.joinSession.description', "Join a live coding session using an invite code"),
-                icon: Codicon.account,
-                content: {
-                        type: 'startEntry',
-                        command: 'command:livecollab.joinSession',
-                }
-        },
+        
 
 ];
 
