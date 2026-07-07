@@ -27,7 +27,7 @@ LiveCollab is the full editor developers already rely on, with editing, extensio
 
 > **LiveCollab is built to eliminate up to 80% of collaborative-coding friction, and that's just the foundation.**
 
-The entry point is students and learners, people collaborating on code for the first time. The vision expands outward from there: remote teams, pair programming, code reviews, hackathons, bootcamps, and classrooms. Anywhere people build software together.
+The entry point is students and learners, people collaborating on code for the first time. The vision expands outward from there: remote teams, pair programming, code reviews, hackathons, bootcamps, and classrooms. Anywhere people build software together, from a startup team shipping through an accelerator to two students on their first project.
 
 ---
 
