@@ -50,8 +50,6 @@ The entry point is students and learners, people collaborating on code for the f
 
 Actively developed and built in public. Early and evolving quickly.
 
-*A note on commit history: I tend to commit in batches after finishing several features at once, so the raw commit count understates the actual work. The project represents far more building than the graph suggests.*
-
 ---
 
 ## How it is built
