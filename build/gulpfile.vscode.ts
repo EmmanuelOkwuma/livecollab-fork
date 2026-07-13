@@ -65,6 +65,7 @@ const vscodeResourceIncludes = [
 	// Workbench
 	'out-build/vs/code/electron-browser/workbench/workbench.html',
 	'out-build/vs/code/electron-browser/workbench/livecollab-bootstrap.html',
+	'out-build/vs/code/electron-browser/workbench/socket.io.esm.min.js',
 	'out-build/vs/sessions/electron-browser/sessions.html',
 
 	// Electron Preload
