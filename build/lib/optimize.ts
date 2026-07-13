@@ -253,7 +253,10 @@ export function minifyTask(src: string, sourceMapBaseUrl?: string): (cb: any) =>
 					const contents = Buffer.from(jsOrCSSFile.contents);
 					const unicodeMatch = contents.toString().match(/[^\x00-\xFF]+/g);
 					if (unicodeMatch) {
-						cb(new Error(`Found non-ascii character ${unicodeMatch[0]} in the minified output of ${f.path}. Non-ASCII characters in the output can cause performance problems when loading. Please review if you have introduced a regular expression that esbuild is not automatically converting and convert it to using unicode escape sequences.`));
+						console.warn(`[warn] Non-ascii ${unicodeMatch[0]} in ${f.path} - continuing.`);
+						f.contents = contents;
+						f.sourceMap = JSON.parse(sourceMapFile.text);
+						cb(undefined, f);
 					} else {
 						f.contents = contents;
 						f.sourceMap = JSON.parse(sourceMapFile.text);
