@@ -770,11 +770,13 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
                         (global as any)._livecollabPendingRoomName = undefined;
                         return roomName || null;
                 });
+                        electron.ipcMain.removeHandler('vscode:livecollab-get-pending-reset-token');
                         electron.ipcMain.handle('vscode:livecollab-get-pending-reset-token', (_event) => {
 			const resetToken = (global as any)._livecollabPendingResetToken;
 			(global as any)._livecollabPendingResetToken = undefined;
 			return resetToken;
 		});
+			electron.ipcMain.removeHandler('vscode:livecollab-start-auth');
 			electron.ipcMain.handle('vscode:livecollab-start-auth', async (_event, clerkBaseUrl: string) => {
 			// Start a one-time localhost HTTP server to receive the Clerk OAuth callback
 			const http = await import('http');
@@ -871,84 +873,39 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			});
 		});
 
-electron.ipcMain.removeHandler('vscode:livecollab-mint-token');
-                        electron.ipcMain.handle('vscode:livecollab-mint-token', async (_event, dbjwt: string) => {
-			// Mint a real Clerk session JWT (for the socket) from the persisted dev-browser token.
-			try {
-				if (!dbjwt) { return null; }
-				const https5 = await import('https');
-				const secret5 = process.env.CLERK_SECRET_KEY || '';
-				const client: any = await new Promise((res) => {
-					const body = JSON.stringify({ token: dbjwt });
-					const r = https5.request('https://api.clerk.com/v1/clients/verify', {
-						method: 'POST',
-						headers: { 'Authorization': 'Bearer ' + secret5, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-					}, (resp) => { let d=''; resp.on('data',(c)=>d+=c); resp.on('end',()=>{ try{res(JSON.parse(d));}catch(e){res(null);} }); });
-					r.on('error', () => res(null));
-					r.write(body); r.end();
+				const lcServerPost = (path: string, token: string): Promise<any> => new Promise(async (resolve) => {
+					try {
+						const httpsMod = await import('https');
+						const payload = JSON.stringify({ token });
+						const r = httpsMod.request('https://live-collab-production.up.railway.app' + path, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+						}, (resp) => {
+							let d = '';
+							resp.on('data', (c) => d += c);
+							resp.on('end', () => { try { resolve(JSON.parse(d)); } catch (e) { resolve(null); } });
+						});
+						r.on('error', () => resolve(null));
+						r.write(payload); r.end();
+					} catch (e) { resolve(null); }
 				});
-				if (!client) { return null; }
-				const sid = client.last_active_session_id;
-				if (!sid) { return null; }
-				const jwt: string | null = await new Promise((res) => {
-					const r = https5.request('https://api.clerk.com/v1/sessions/' + sid + '/tokens', {
-						method: 'POST',
-						headers: { 'Authorization': 'Bearer ' + secret5, 'Content-Type': 'application/json', 'Content-Length': 2 }
-					}, (resp) => { let d=''; resp.on('data',(c)=>d+=c); resp.on('end',()=>{ try{ const o=JSON.parse(d); res(o.jwt||null); }catch(e){res(null);} }); });
-					r.on('error', () => res(null));
-					r.write('{}'); r.end();
+				electron.ipcMain.removeHandler('vscode:livecollab-mint-token');
+				electron.ipcMain.handle('vscode:livecollab-mint-token', async (_event, dbjwt: string) => {
+					// Ask our server to mint the Clerk session JWT. Secret stays server-side.
+					try {
+						if (!dbjwt) { return null; }
+						const out = await lcServerPost('/auth/token', dbjwt);
+						return (out && out.jwt) ? out.jwt : null;
+					} catch (e) { return null; }
 				});
-				return jwt;
-			} catch (e) { return null; }
-		});
-
-		electron.ipcMain.removeHandler('vscode:livecollab-check-session');
-                        electron.ipcMain.handle('vscode:livecollab-check-session', async (_event, dbjwt: string) => {
-			// Verify a persisted dev-browser token on startup; return user if a session is active, else null
-			try {
-				if (!dbjwt) { return null; }
-				const https4 = await import('https');
-				const secret4 = process.env.CLERK_SECRET_KEY || '';
-				const client: any = await new Promise((res) => {
-					const body = JSON.stringify({ token: dbjwt });
-					const r = https4.request('https://api.clerk.com/v1/clients/verify', {
-						method: 'POST',
-						headers: { 'Authorization': 'Bearer ' + secret4, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-					}, (resp) => { let d=''; resp.on('data',(c)=>d+=c); resp.on('end',()=>{ try{res(JSON.parse(d));}catch(e){res(null);} }); });
-					r.on('error', () => res(null));
-					r.write(body); r.end();
+				electron.ipcMain.removeHandler('vscode:livecollab-check-session');
+				electron.ipcMain.handle('vscode:livecollab-check-session', async (_event, dbjwt: string) => {
+					// Ask our server who this user is. Secret stays server-side.
+					try {
+						if (!dbjwt) { return null; }
+						return await lcServerPost('/auth/session', dbjwt);
+					} catch (e) { return null; }
 				});
-				if (!client || !Array.isArray(client.sessions)) { return null; }
-				const sid = client.last_active_session_id;
-				const sess = client.sessions.find((s: any) => s.id === sid) || client.sessions[0];
-				if (!sess || sess.status !== 'active' || !sess.user_id) { return null; }
-				const uid = sess.user_id;
-				let vprov = (client.last_authentication_strategy || '').replace('oauth_', '');
-				vprov = vprov ? vprov.charAt(0).toUpperCase() + vprov.slice(1) : '';
-				const userData: any = await new Promise((res) => {
-					const r = https4.request('https://api.clerk.com/v1/users/' + uid, {
-						method: 'GET',
-						headers: { 'Authorization': 'Bearer ' + secret4, 'Content-Type': 'application/json' }
-					}, (resp) => { let d=''; resp.on('data',(c)=>d+=c); resp.on('end',()=>{ try{res(JSON.parse(d));}catch(e){res(null);} }); });
-					r.on('error', () => res(null));
-					r.end();
-				});
-				if (!userData || !userData.id) { return null; }
-				const fullName = ((userData.first_name||'') + ' ' + (userData.last_name||'')).trim();
-				let email = '';
-				if (Array.isArray(userData.email_addresses) && userData.email_addresses.length) {
-					const match = userData.email_addresses.find((e:any)=>e.id===userData.primary_email_address_id) || userData.email_addresses[0];
-					email = match ? match.email_address : '';
-				}
-				let provider = vprov;
-				if (!provider && Array.isArray(userData.external_accounts) && userData.external_accounts.length) {
-					const p = (userData.external_accounts[0].provider||'').replace('oauth_',''); provider = p?p.charAt(0).toUpperCase()+p.slice(1):'';
-				}
-				const onboarded = !!(userData.public_metadata && userData.public_metadata.onboarded);
-				const displayName = (userData.public_metadata && userData.public_metadata.displayName) ? userData.public_metadata.displayName : '';
-				return { fullName: fullName, email: email, provider: provider, userId: userData.id, onboarded: onboarded, sessionId: sess.id, displayName: displayName };
-			} catch (e) { return null; }
-		});
 
 		electron.ipcMain.on('vscode:livecollab-logout', async (_event, sessionId: string) => {
 			// Revoke the Clerk session server-side so the wristband is destroyed everywhere
@@ -993,6 +950,7 @@ electron.ipcMain.removeHandler('vscode:livecollab-mint-token');
 			}
 		});
 
+		electron.ipcMain.removeHandler('vscode:livecollab-get-pending-token');
 		electron.ipcMain.handle('vscode:livecollab-get-pending-token', (_event) => {
 				const token = _pendingToken;
 				_pendingToken = undefined;

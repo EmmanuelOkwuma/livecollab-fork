@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
-	<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src https://fitting-mako-44.accounts.dev https://fitting-mako-44.clerk.accounts.dev https://live-collab-production.up.railway.app wss://live-collab-production.up.railway.app;">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' blob: https://fitting-mako-44.clerk.accounts.dev; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; connect-src https://main.vscode-cdn.net https://fitting-mako-44.accounts.dev https://fitting-mako-44.clerk.accounts.dev https://live-collab-production.up.railway.app wss://live-collab-production.up.railway.app;">
 	<title>LiveCollab</title>
 	<style>
 		* { margin: 0; padding: 0; box-sizing: border-box; }
@@ -291,7 +291,7 @@
 		#page-landing, .auth-page, #page-vibe, #page-dashboard { opacity: 1; transition: opacity 220ms ease; }
 		.page-fading { opacity: 0 !important; }
 	</style>
-<script src="clerk.browser.js"></script>
+<script src="https://fitting-mako-44.clerk.accounts.dev/npm/@clerk/clerk-js@5.127.1/dist/clerk.browser.js" data-clerk-publishable-key="pk_test_Zml0dGluZy1tYWtvLTQ0LmNsZXJrLmFjY291bnRzLmRldiQ" crossorigin="anonymous"></script>
 <script>
 	var PAGES = ['page-landing','page-signin','page-signup','page-displayname','page-describe','page-vibe','page-dashboard'];
 	function show(id) {
@@ -487,7 +487,7 @@
 			</div></div>
 		</div>
 		<div class="dspacer"></div>
-		<div class="profile"><div class="pbtn" id="d-pbtn"><div class="avatar" id="d-avatar">EO</div><div class="pinfo"><div class="pname" id="d-pname">HARDCODE_TEST</div><div class="pplan">Free plan</div></div></div></div>
+		<div class="profile"><div class="pbtn" id="d-pbtn"><div class="avatar" id="d-avatar">EO</div><div class="pinfo"><div class="pname" id="d-pname"></div><div class="pplan">Free plan</div></div></div></div>
 	</div>
 		<!-- SETTINGS MODAL v3 -->
 	<div class="st-backdrop" id="st-backdrop">
@@ -778,12 +778,12 @@
 			13:{t:'Send feedback',save:true,html:'<div class="st-instr">Tell us what\'s working or what\'s not...</div>'},
 			14:{t:'About LiveCollab',html:'<div class="st-card"><div class="st-frow"><span class="st-fl">Version</span><span class="st-fv">2.0.0</span></div><div class="st-frow"><span class="st-fl">Terms of Service</span>'+chev+'</div><div class="st-frow"><span class="st-fl">Privacy Policy</span>'+chev+'</div></div>'}
 		};
-		window.stGo = function(n){ var d=SUB[n]; subtitle.textContent=d.t; var live=d.html; var fn=(window._dashFullName||'Your name'); var dn=(window._dashDisplayName||window._dashFullName||'Manny'); var em=(window._dashEmail||'fake@fake.com'); var pv=(window._dashProvider||'FAKE_PROVIDER'); live=live.split('@@FULLNAME@@').join(fn).split('@@DISPLAYNAME@@').join(dn).split('@@EMAIL@@').join(em).split('@@PROVIDER@@').join(pv); subbody.innerHTML=live; confirmbtn.style.visibility=d.save?'visible':'hidden'; pages.style.transform='translateX(-100%)'; };
+		window.stGo = function(n){ var d=SUB[n]; subtitle.textContent=d.t; var live=d.html; var fn=(window._dashFullName||window._dashDisplayName||''); var dn=(window._dashDisplayName||window._dashFullName||''); var em=(window._dashEmail||''); var pv=(window._dashProvider||''); live=live.split('@@FULLNAME@@').join(fn).split('@@DISPLAYNAME@@').join(dn).split('@@EMAIL@@').join(em).split('@@PROVIDER@@').join(pv); subbody.innerHTML=live; confirmbtn.style.visibility=d.save?'visible':'hidden'; pages.style.transform='translateX(-100%)'; };
 		function stBack(){ pages.style.transform='translateX(0)'; }
 		var backBtn=document.getElementById('st-back'); if(backBtn) backBtn.onclick=stBack;
 		if(confirmbtn) confirmbtn.onclick=stBack;
 		var pbtn=document.getElementById('d-pbtn');
-		if(pbtn) pbtn.onclick=function(e){ e.stopPropagation(); stBack(); var dn=(window._dashDisplayName||window._dashFullName||'Emmanuel Okwuma'); var ini=dn.trim().split(/\s+/).map(function(x){return x[0]}).slice(0,2).join('').toUpperCase(); var nmEl=document.getElementById('st-name'); if(nmEl) nmEl.textContent=dn; var avEl=document.getElementById('st-av'); if(avEl) avEl.textContent=ini; var emEl=document.getElementById('st-email'); if(emEl) emEl.textContent=(window._dashEmail||''); var pv=document.getElementById('st-provider'); if(pv && window._dashProvider) pv.textContent=window._dashProvider; var picon=document.getElementById('st-provider-icon'); if(picon){ var pr=(window._dashProvider||'').toLowerCase(); var G={google:'<svg viewBox=\'0 0 24 24\'><path fill=\'#4285F4\' d=\'M21.6 12.2c0-.6-.1-1.2-.2-1.8H12v3.4h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.1z\'/><path fill=\'#34A853\' d=\'M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 .9-3.4.9-2.6 0-4.8-1.7-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22z\'/><path fill=\'#FBBC05\' d=\'M6.4 13.9a6 6 0 0 1 0-3.8V7.5H3.1a10 10 0 0 0 0 9z\'/><path fill=\'#EA4335\' d=\'M12 6.1c1.5 0 2.8.5 3.8 1.5l2.8-2.8A10 10 0 0 0 3.1 7.5l3.3 2.6C7.2 7.8 9.4 6.1 12 6.1z\'/></svg>',github:'<svg viewBox=\'0 0 24 24\' fill=\'#E8E8E8\'><path d=\'M12 2C6.5 2 2 6.5 2 12c0 4.4 2.9 8.2 6.8 9.5.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.4-3.4-1.4-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.6 2.4 1.1 3 .8.1-.6.3-1.1.6-1.4-2.2-.2-4.6-1.1-4.6-4.9 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.7 1a9.4 9.4 0 0 1 5 0c1.9-1.3 2.7-1 2.7-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.8-2.4 4.7-4.6 4.9.3.3.7 1 .7 1.9v2.8c0 .3.2.6.7.5A10 10 0 0 0 22 12c0-5.5-4.5-10-10-10z\'/></svg>',gitlab:'<svg viewBox=\'0 0 24 24\'><path fill=\'#E24329\' d=\'M12 21l3.4-10.5H8.6z\'/><path fill=\'#FC6D26\' d=\'M12 21L8.6 10.5H3.8z\'/><path fill=\'#FCA326\' d=\'M3.8 10.5L2.7 13.9c-.1.3 0 .6.3.8L12 21z\'/><path fill=\'#E24329\' d=\'M3.8 10.5h4.8L6.5 4.1c-.1-.3-.5-.3-.6 0z\'/><path fill=\'#FC6D26\' d=\'M12 21l3.4-10.5h4.8z\'/><path fill=\'#FCA326\' d=\'M20.2 10.5l1.1 3.4c.1.3 0 .6-.3.8L12 21z\'/><path fill=\'#E24329\' d=\'M20.2 10.5h-4.8l2.1-6.4c.1-.3.5-.3.6 0z\'/></svg>' }; var fb='<svg viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'#B0B0AA\' stroke-width=\'1.6\'><rect x=\'3\' y=\'11\' width=\'18\' height=\'11\' rx=\'2\'/><path d=\'M7 11V7a5 5 0 0 1 10 0v4\'/></svg>'; picon.innerHTML = G[pr] || fb; } backdrop.classList.add('open'); };
+		if(pbtn) pbtn.onclick=function(e){ e.stopPropagation(); stBack(); var dn=(window._dashDisplayName||window._dashFullName||'Account'); var ini=dn.trim().split(/\s+/).map(function(x){return x[0]}).slice(0,2).join('').toUpperCase(); var nmEl=document.getElementById('st-name'); if(nmEl) nmEl.textContent=dn; var avEl=document.getElementById('st-av'); if(avEl) avEl.textContent=ini; var emEl=document.getElementById('st-email'); if(emEl) emEl.textContent=(window._dashEmail||''); var pv=document.getElementById('st-provider'); if(pv && window._dashProvider) pv.textContent=window._dashProvider; var picon=document.getElementById('st-provider-icon'); if(picon){ var pr=(window._dashProvider||'').toLowerCase(); var G={google:'<svg viewBox=\'0 0 24 24\'><path fill=\'#4285F4\' d=\'M21.6 12.2c0-.6-.1-1.2-.2-1.8H12v3.4h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.1z\'/><path fill=\'#34A853\' d=\'M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 .9-3.4.9-2.6 0-4.8-1.7-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22z\'/><path fill=\'#FBBC05\' d=\'M6.4 13.9a6 6 0 0 1 0-3.8V7.5H3.1a10 10 0 0 0 0 9z\'/><path fill=\'#EA4335\' d=\'M12 6.1c1.5 0 2.8.5 3.8 1.5l2.8-2.8A10 10 0 0 0 3.1 7.5l3.3 2.6C7.2 7.8 9.4 6.1 12 6.1z\'/></svg>',github:'<svg viewBox=\'0 0 24 24\' fill=\'#E8E8E8\'><path d=\'M12 2C6.5 2 2 6.5 2 12c0 4.4 2.9 8.2 6.8 9.5.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.4-3.4-1.4-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.6 2.4 1.1 3 .8.1-.6.3-1.1.6-1.4-2.2-.2-4.6-1.1-4.6-4.9 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.7 1a9.4 9.4 0 0 1 5 0c1.9-1.3 2.7-1 2.7-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.8-2.4 4.7-4.6 4.9.3.3.7 1 .7 1.9v2.8c0 .3.2.6.7.5A10 10 0 0 0 22 12c0-5.5-4.5-10-10-10z\'/></svg>',gitlab:'<svg viewBox=\'0 0 24 24\'><path fill=\'#E24329\' d=\'M12 21l3.4-10.5H8.6z\'/><path fill=\'#FC6D26\' d=\'M12 21L8.6 10.5H3.8z\'/><path fill=\'#FCA326\' d=\'M3.8 10.5L2.7 13.9c-.1.3 0 .6.3.8L12 21z\'/><path fill=\'#E24329\' d=\'M3.8 10.5h4.8L6.5 4.1c-.1-.3-.5-.3-.6 0z\'/><path fill=\'#FC6D26\' d=\'M12 21l3.4-10.5h4.8z\'/><path fill=\'#FCA326\' d=\'M20.2 10.5l1.1 3.4c.1.3 0 .6-.3.8L12 21z\'/><path fill=\'#E24329\' d=\'M20.2 10.5h-4.8l2.1-6.4c.1-.3.5-.3.6 0z\'/></svg>' }; var fb='<svg viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'#B0B0AA\' stroke-width=\'1.6\'><rect x=\'3\' y=\'11\' width=\'18\' height=\'11\' rx=\'2\'/><path d=\'M7 11V7a5 5 0 0 1 10 0v4\'/></svg>'; picon.innerHTML = G[pr] || fb; } backdrop.classList.add('open'); };
 		var cl=document.getElementById('st-close'); if(cl) cl.onclick=function(){ backdrop.classList.remove('open'); };
 		var lo=document.getElementById('st-logout');
 		var stConfirm=document.getElementById('st-confirm');
@@ -846,9 +846,9 @@
 	function startVibe() { vibeShowLine('builder'); }
 
 	// ===== DASHBOARD =====
-	var dashName = 'Emmanuel';
+	var dashName = '';
 	var dashEmail = 'emmanuelokwuma111@gmail.com';
-	var dashFullName = 'Emmanuel Okwuma';
+	var dashFullName = '';
 	function dashInitials(name) {
 		if (!name) return '??';
 		var parts = name.trim().split(/\s+/);
@@ -1197,7 +1197,9 @@
 
 	<script type="module">
 		// ===== LiveCollab dashboard socket (Option 1: dashboard's own connection) =====
+		console.log('[LC-MODULE] before import');
 		import { io } from './socket.io.esm.min.js';
+		console.log('[LC-MODULE] after import, io =', typeof io);
 		const SERVER_URL = 'https://live-collab-production.up.railway.app';
 		let lcSocket = null;
 		let lcConnecting = false;
