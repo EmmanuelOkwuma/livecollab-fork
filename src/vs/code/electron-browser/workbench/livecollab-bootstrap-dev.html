@@ -642,6 +642,7 @@
 				window._dashOnboarded = !!u.onboarded;
 				window._dashSessionId = u.sessionId || '';
 				// Prefill display-name input from Clerk full name (first name) if empty
+				try { window.dispatchEvent(new CustomEvent('livecollab:identity-ready')); } catch(e) {}
 				var dni = document.getElementById('display-name-input');
 				if (dni && !dni.value && u.fullName) { dni.value = u.fullName.split(' ')[0]; }
 			});
@@ -731,6 +732,7 @@
 					window._dashProvider = prov || '';
 					window._dashUserId = user.id || '';
 					window._dashOnboarded = !!(user.publicMetadata && user.publicMetadata.onboarded);
+					try { window.dispatchEvent(new CustomEvent('livecollab:identity-ready')); } catch(e) {}
 					var dni = document.getElementById('display-name-input');
 					if (dni && !dni.value && fn) { dni.value = fn.split(' ')[0]; }
 				}
@@ -1177,6 +1179,7 @@
 							window._dashUserId = u.userId || '';
 							window._dashSessionId = u.sessionId || '';
 							window._dashOnboarded = !!u.onboarded;
+							try { window.dispatchEvent(new CustomEvent('livecollab:identity-ready')); } catch(e) {}
 							if (u.onboarded) {
 								_routed = true;
 								show('page-dashboard');
@@ -1425,21 +1428,17 @@
 // search wired by lcSetupSearch()
 		}
 
-		// Connect when the dashboard becomes visible. Hook into existing initDashboard via a poll-once.
-		(function lcInit() {
-			let tries = 0;
-			const iv = setInterval(() => {
-				tries++;
-				const dash = document.getElementById('page-dashboard');
-				const visible = dash && dash.classList.contains('active');
-				if (visible || (window._dashUserId)) {
+				// Wire the dashboard the moment identity arrives, from any auth path.
+				// (Replaces a 200ms/20s poll that fresh sign-ins always lost: a browser
+				// round-trip takes longer than 20s, so the poll died before identity landed.)
+				function lcOnIdentityReady() {
+					if (!window._dashUserId) { return; }
 					lcWireButtons();
 					lcConnect();
-					clearInterval(iv);
 				}
-				if (tries > 100) clearInterval(iv);
-			}, 200);
-		})();
+				window.addEventListener('livecollab:identity-ready', lcOnIdentityReady);
+				// Covers the reverse race: identity may have landed before we were listening.
+				lcOnIdentityReady();
 	</script>
 </body>
 </html>
