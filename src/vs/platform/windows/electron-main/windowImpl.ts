@@ -791,69 +791,21 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 						let verifiedProvider = '';
 						let verifiedSessionId = '';
 						// Resolve user via Clerk Backend API using the dev-browser token (works fresh AND returning)
-						if (dbjwt) {
-							const https1 = await import('https');
-							const secret1 = process.env.CLERK_SECRET_KEY || '';
-							const client: any = await new Promise((resolveClient) => {
-								const body = JSON.stringify({ token: dbjwt });
-								const r = https1.request('https://api.clerk.com/v1/clients/verify', {
-									method: 'POST',
-									headers: { 'Authorization': 'Bearer ' + secret1, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-								}, (resp) => {
-									let d = '';
-									resp.on('data', (c) => d += c);
-									resp.on('end', () => { try { resolveClient(JSON.parse(d)); } catch (e) { resolveClient(null); } });
-								});
-								r.on('error', () => resolveClient(null));
-								r.write(body); r.end();
-							});
-							if (client) {
-								const sid = client.last_active_session_id;
-								let sess: any = null;
-								if (Array.isArray(client.sessions)) { sess = client.sessions.find((s: any) => s.id === sid) || client.sessions[0]; }
-								if (sess && sess.user_id) { userId = sess.user_id; }
-								if (sess && sess.id) { verifiedSessionId = sess.id; }
-								const strat = client.last_authentication_strategy || '';
-								let vp = strat.replace('oauth_', '');
-								verifiedProvider = vp ? vp.charAt(0).toUpperCase() + vp.slice(1) : '';
-							}
-						}
-						if (userId && userId.indexOf('user_') === 0) {
-							const https = await import('https');
-							const secret = process.env.CLERK_SECRET_KEY || '';
-							const userData: any = await new Promise((resolveUser) => {
-								const apiReq = https.request('https://api.clerk.com/v1/users/' + userId, {
-									method: 'GET',
-									headers: { 'Authorization': 'Bearer ' + secret, 'Content-Type': 'application/json' }
-								}, (apiRes) => {
-									let body = '';
-									apiRes.on('data', (c) => body += c);
-									apiRes.on('end', () => { try { resolveUser(JSON.parse(body)); } catch (e) { resolveUser(null); } });
-								});
-								apiReq.on('error', () => resolveUser(null));
-								apiReq.end();
-							});
-							if (userData && userData.id) {
-								const first = userData.first_name || '';
-								const last = userData.last_name || '';
-								const fullName = (first + ' ' + last).trim();
-								let email = '';
-								if (Array.isArray(userData.email_addresses) && userData.email_addresses.length) {
-									const primaryId = userData.primary_email_address_id;
-									const match = userData.email_addresses.find((e: any) => e.id === primaryId) || userData.email_addresses[0];
-									email = match ? match.email_address : '';
+								if (dbjwt) {
+									// Ask our server to resolve this user. Clerk secret stays server-side.
+									const u: any = await lcServerPost('/auth/session', dbjwt);
+									if (u && u.userId && this._win && !this._win.isDestroyed()) {
+										this._win.webContents.send('vscode:livecollab-clerk-user', {
+											fullName: u.fullName || '',
+											email: u.email || '',
+											provider: u.provider || '',
+											userId: u.userId,
+											onboarded: !!u.onboarded,
+											sessionId: u.sessionId || '',
+											displayName: u.displayName || ''
+										});
+									}
 								}
-								let provider = verifiedProvider || '';
-								if (!provider && Array.isArray(userData.external_accounts) && userData.external_accounts.length) {
-									const prov = (userData.external_accounts[0].provider || '').replace('oauth_', '');
-									provider = prov ? prov.charAt(0).toUpperCase() + prov.slice(1) : '';
-								}
-							const onboarded = !!(userData.public_metadata && userData.public_metadata.onboarded);
-								if (this._win && !this._win.isDestroyed()) {
-									this._win.webContents.send('vscode:livecollab-clerk-user', { fullName: fullName, email: email, provider: provider, userId: userData.id, onboarded: onboarded, sessionId: verifiedSessionId });
-								}
-							}
-						}
 					} catch (e) { /* ignore, still advance */ }
 					// Send callback URL to bootstrap window
 					if (this._win && !this._win.isDestroyed()) {
@@ -873,7 +825,7 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			});
 		});
 
-				const lcServerPost = (path: string, token: string): Promise<any> => new Promise(async (resolve) => {
+				function lcServerPost(path: string, token: string): Promise<any> { return new Promise(async (resolve) => {
 					try {
 						const httpsMod = await import('https');
 						const payload = JSON.stringify({ token });
@@ -888,7 +840,7 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 						r.on('error', () => resolve(null));
 						r.write(payload); r.end();
 					} catch (e) { resolve(null); }
-				});
+				}); }
 				electron.ipcMain.removeHandler('vscode:livecollab-mint-token');
 				electron.ipcMain.handle('vscode:livecollab-mint-token', async (_event, dbjwt: string) => {
 					// Ask our server to mint the Clerk session JWT. Secret stays server-side.
