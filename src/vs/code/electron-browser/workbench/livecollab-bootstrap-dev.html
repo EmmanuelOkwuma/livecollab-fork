@@ -478,10 +478,8 @@
 			</div></div>
 			<div class="action sec" id="d-nav-join"><svg viewBox="0 0 16 16"><use href="#d-link"/></svg>Join with Invite</div>
 			<div class="lcpanel" id="lcp-join"><div class="lcp-inner">
-				<div class="lcp-hint">Enter or paste the 6-character invite code.</div>
-				<div class="lcp-codeboxes" id="lcp-codeboxes">
-					<input class="lcp-cbx" maxlength="1" data-i="0"><input class="lcp-cbx" maxlength="1" data-i="1"><input class="lcp-cbx" maxlength="1" data-i="2"><input class="lcp-cbx" maxlength="1" data-i="3"><input class="lcp-cbx" maxlength="1" data-i="4"><input class="lcp-cbx" maxlength="1" data-i="5">
-				</div>
+							<div class="lcp-hint">Paste the invite code.</div>
+							<input class="lcp-input" id="lcp-joincode" placeholder="Invite code" autocomplete="off" spellcheck="false">
 				<div class="lcp-err" id="lcp-join-err"></div>
 				<button class="lcp-btn" id="lcp-join-go">Join room</button>
 			</div></div>
@@ -1365,7 +1363,7 @@
 			panel.classList.toggle('open', !open);
 			if(!open){
 				lcConnect();
-				setTimeout(function(){ var f=isCreate?document.getElementById('lcp-roomname'):document.querySelector('#lcp-codeboxes .lcp-cbx'); if(f) f.focus(); }, 200);
+				setTimeout(function(){ var f=isCreate?document.getElementById('lcp-roomname'):document.getElementById('lcp-joincode'); if(f) f.focus(); }, 200);
 			}
 		}
 		function doCreateFlow(){ lcTogglePanel('create'); }
@@ -1379,7 +1377,7 @@
 			if(roomId){ if(input) input.value=''; if(err) err.textContent=''; document.getElementById('lcp-create').classList.remove('open'); await lcRefreshRooms(); lcOpenRoom(roomId); }
 			else { if(err) err.textContent='Could not create room. Try again.'; }
 		}
-		function lcReadCode(){ return [].slice.call(document.querySelectorAll('#lcp-codeboxes .lcp-cbx')).map(function(b){ return b.value||''; }).join('').trim(); }
+		function lcReadCode(){ var el=document.getElementById('lcp-joincode'); return (el&&el.value||'').trim(); }
 		async function lcSubmitJoin(){
 			var err=document.getElementById('lcp-join-err');
 			var code=lcReadCode();
@@ -1394,13 +1392,10 @@
 				var cgo=document.getElementById('lcp-create-go'); if(cgo&&!cgo._w){ cgo._w=1; cgo.onclick=lcSubmitCreate; }
 				var jgo=document.getElementById('lcp-join-go'); if(jgo&&!jgo._w){ jgo._w=1; jgo.onclick=lcSubmitJoin; }
 				var rn=document.getElementById('lcp-roomname'); if(rn&&!rn._w){ rn._w=1; rn.addEventListener('keydown',function(e){ if(e.key==='Enter') lcSubmitCreate(); if(e.key==='Escape') document.getElementById('lcp-create').classList.remove('open'); }); }
-				var boxes=[].slice.call(document.querySelectorAll('#lcp-codeboxes .lcp-cbx'));
-				boxes.forEach(function(box,i){
-					if(box._w) return; box._w=1;
-					box.addEventListener('input',function(){ box.value=box.value.toUpperCase(); box.classList.toggle('filled',!!box.value); if(box.value&&i<boxes.length-1) boxes[i+1].focus(); });
-					box.addEventListener('keydown',function(e){ if(e.key==='Backspace'&&!box.value&&i>0) boxes[i-1].focus(); if(e.key==='Enter') lcSubmitJoin(); if(e.key==='Escape') document.getElementById('lcp-join').classList.remove('open'); });
-					box.addEventListener('paste',function(e){ e.preventDefault(); var txt=((e.clipboardData||window.clipboardData).getData('text')||'').replace(/\\s/g,'').toUpperCase(); boxes.forEach(function(b,j){ b.value=txt[j]||''; b.classList.toggle('filled',!!txt[j]); }); var next=Math.min(txt.length,boxes.length-1); boxes[next].focus(); });
-				});
+						var jc=document.getElementById('lcp-joincode');
+						if(jc&&!jc._w){ jc._w=1;
+							jc.addEventListener('keydown',function(e){ if(e.key==='Enter') lcSubmitJoin(); if(e.key==='Escape') document.getElementById('lcp-join').classList.remove('open'); });
+						}
 			}
 			var t=setInterval(function(){ if(document.getElementById('lcp-create-go')){ wireP(); clearInterval(t); } },200);
 		})();
