@@ -1221,7 +1221,11 @@
 			try {
 				const jwt = await lcMintToken();
 				if (!jwt) { lcConnecting = false; console.warn('[LiveCollab] no token to connect dashboard socket'); return null; }
-				lcSocket = io(SERVER_URL, { auth: { token: jwt }, transports: ['websocket'] });
+				lcSocket = io(SERVER_URL, {
+						auth: function(cb){ lcMintToken().then(function(t){ cb({ token: t || jwt || '' }); }).catch(function(){ cb({ token: jwt || '' }); }); },
+						transports: ['websocket'],
+						reconnection: true
+					});
 				lcSocket.on('connect', () => { lcConnecting = false; console.log('[LiveCollab] dashboard socket connected'); lcRefreshRooms(); });
 				lcSocket.on('connect_error', (e) => { lcConnecting = false; console.warn('[LiveCollab] dashboard socket error:', e && e.message); });
 				lcSocket.on('disconnect', () => { console.log('[LiveCollab] dashboard socket disconnected'); });

@@ -103,6 +103,19 @@ export class LiveCollabService extends Disposable {
 
 	hasToken(): boolean { return !!this._token; }
 
+	// Re-mint a fresh Clerk session JWT from the long-lived dvb_ token.
+	// Called on every socket (re)connect so the token is never stale. (#12)
+	async refreshToken(): Promise<string | undefined> {
+		try {
+			const ipc = (window as any).vscode?.ipcRenderer;
+			if (!ipc) { return this._token; }
+			const dvbJwt = (() => { try { return localStorage.getItem('__clerk_db_jwt') || ''; } catch { return ''; } })();
+			if (!dvbJwt) { return this._token; }
+			const fresh = await ipc.invoke('vscode:livecollab-mint-token', dvbJwt) as string | null;
+			if (fresh) { this._token = fresh; return fresh; }
+			return this._token;
+		} catch { return this._token; }
+	}
 	async connect(): Promise<void> {
 		if (!this._token) { return; }
 		if (this.socket?.connected) { return; }
@@ -111,13 +124,28 @@ export class LiveCollabService extends Disposable {
 		if (this.socket) { this.socket.disconnect(); this.socket = null; }
 		// @ts-ignore
 		const { io } = await import('./vendor/socket.io.esm.min.js');
-		this.socket = io(SERVER_URL, { auth: { token: this._token }, transports: ['websocket'] });
+		this.socket = io(SERVER_URL, {
+			auth: async (cb: (data: { token: string }) => void) => {
+				const fresh = await this.refreshToken();
+				cb({ token: fresh || this._token || '' });
+			},
+			transports: ['websocket'],
+			reconnection: true,
+		});
 		this.socket.on('connect', () => {
 			this._connecting = false;
 			console.log('[LiveCollab] socket connected, user:', this._displayName);
 			this._onConnected.fire();
 		});
-		this.socket.on('disconnect', () => { this._connecting = false; this._onDisconnected.fire(); });
+		this.socket.on('connect_error', (err: any) => {
+			this._connecting = false;
+			console.warn('[LiveCollab] socket connect_error:', err && err.message);
+		});
+		this.socket.on('disconnect', (reason: string) => {
+			this._connecting = false;
+			console.log('[LiveCollab] socket disconnected, reason:', reason);
+			this._onDisconnected.fire();
+		});
 		this.socket.on('room:members', ({ members }: { members: ILiveCollabMember[] }) => {
 			console.log('[LiveCollab] room:members received:', members.length);
 			this._lastMembers = members;
