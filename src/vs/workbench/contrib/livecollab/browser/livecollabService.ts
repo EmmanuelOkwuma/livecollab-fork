@@ -135,6 +135,17 @@ export class LiveCollabService extends Disposable {
 		this.socket.on('connect', () => {
 			this._connecting = false;
 			console.log('[LiveCollab] socket connected, user:', this._displayName);
+			// If we were already in a room, this is a RECONNECT: re-join so the server
+			// re-subscribes this socket to the room. room:join only fired on first connect
+			// before, so after a reconnect the socket was live but not in any room. (#19)
+			if (this._roomId) {
+				const rid = this._roomId;
+				console.log('[LiveCollab] reconnected — re-joining room:', rid);
+				this.socket.emit('room:join', { roomId: rid, displayName: this._displayName, colorIndex: 0 }, (res: any) => {
+					if (res?.userId) { this._myUserId = res.userId; }
+					console.log('[LiveCollab] re-join ack:', res && res.ok);
+				});
+			}
 			this._onConnected.fire();
 		});
 		this.socket.on('connect_error', (err: any) => {
