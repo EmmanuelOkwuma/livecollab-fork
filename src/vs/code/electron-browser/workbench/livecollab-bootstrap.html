@@ -695,8 +695,14 @@
 	function markOnboarded() {
 		window._dashOnboarded = true;
 		try {
-			if (window._dashUserId && window.vscode && window.vscode.ipcRenderer) {
-				window.vscode.ipcRenderer.send('vscode:livecollab-mark-onboarded', window._dashUserId);
+			var dvb = '';
+			try { dvb = localStorage.getItem('__clerk_db_jwt') || ''; } catch(e) {}
+			var name = window._dashDisplayName || '';
+			if (dvb && window.vscode && window.vscode.ipcRenderer) {
+				// handle() returns a result so we know if it actually saved; sends token + name (#1)
+				window.vscode.ipcRenderer.invoke('vscode:livecollab-mark-onboarded', dvb, name)
+					.then(function(res){ console.log('[LiveCollab] mark-onboarded:', res && res.ok, res && res.displayName); })
+					.catch(function(){});
 			}
 		} catch (e) {}
 	}

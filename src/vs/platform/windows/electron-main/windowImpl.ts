@@ -825,10 +825,10 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			});
 		});
 
-				function lcServerPost(path: string, token: string): Promise<any> { return new Promise(async (resolve) => {
+				function lcServerPost(path: string, token: string, extra?: Record<string, any>): Promise<any> { return new Promise(async (resolve) => {
 					try {
 						const httpsMod = await import('https');
-						const payload = JSON.stringify({ token });
+						const payload = JSON.stringify({ token, ...(extra || {}) });
 						const r = httpsMod.request('https://live-collab-production.up.railway.app' + path, {
 							method: 'POST',
 							headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
@@ -874,20 +874,15 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			} catch (e) { /* best-effort */ }
 		});
 
-		electron.ipcMain.on('vscode:livecollab-mark-onboarded', async (_event, userId: string) => {
-			// Persist onboarding completion to Clerk public_metadata so future logins skip onboarding
+		electron.ipcMain.removeHandler('vscode:livecollab-mark-onboarded');
+		electron.ipcMain.handle('vscode:livecollab-mark-onboarded', async (_event, dbjwt: string, displayName: string) => {
+			// Persist onboarding + display name via our server (secret stays server-side).
+			// Server resolves the user FROM THE TOKEN — never trusts a client-supplied userId. (#1)
 			try {
-				if (!userId || userId.indexOf('user_') !== 0) { return; }
-				const https2 = await import('https');
-				const secret2 = process.env.CLERK_SECRET_KEY || '';
-				const body = JSON.stringify({ public_metadata: { onboarded: true } });
-				const r = https2.request('https://api.clerk.com/v1/users/' + userId + '/metadata', {
-					method: 'PATCH',
-					headers: { 'Authorization': 'Bearer ' + secret2, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-				}, (resp) => { resp.on('data', () => {}); resp.on('end', () => {}); });
-				r.on('error', () => {});
-				r.write(body); r.end();
-			} catch (e) { /* best-effort */ }
+				if (!dbjwt) { return { ok: false }; }
+				const out = await lcServerPost('/auth/onboarded', dbjwt, { displayName: displayName || '' });
+				return (out && out.ok) ? { ok: true, displayName: out.displayName || '' } : { ok: false };
+			} catch (e) { return { ok: false }; }
 		});
 
 		electron.ipcMain.on('vscode:livecollab-open-browser', (_event, url: string) => {
