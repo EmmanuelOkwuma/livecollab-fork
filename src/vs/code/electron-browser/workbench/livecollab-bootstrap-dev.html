@@ -663,6 +663,7 @@
 
 	// ===== Route after auth: returning (onboarded) -> dashboard; new -> onboarding =====
 	var _routed = false;
+	var _sessionChecked = false; // set true once check-session definitively resolves (#4)
 	// If loaded with #dashboard hash (e.g. from Back to Dashboard), skip straight to dashboard
 		if (window.location.hash === '#dashboard') {
 			window.location.hash = '';
@@ -676,13 +677,18 @@
 		function decide() {
 			attempts++;
 			if (window._dashOnboarded === true) {
+				// Definitively onboarded -> dashboard
 				_routed = true;
 				show('page-dashboard');
 				if (typeof initDashboard === 'function') initDashboard();
-			} else if (window._dashUserId || attempts >= 15) {
-				// We have user data (new user) or waited long enough -> onboarding
+			} else if (_sessionChecked && window._dashUserId && !window._dashOnboarded) {
+				// check-session DEFINITIVELY resolved this user as NOT onboarded -> genuine new user (#4)
 				_routed = true;
 				show('page-displayname');
+			} else if (attempts >= 60) {
+				// Absolute last-resort safety (~4.8s). Never onboard without a user; fall to landing.
+				_routed = true;
+				show(window._dashUserId ? 'page-displayname' : 'page-landing');
 			} else {
 				setTimeout(decide, 80);
 			}
@@ -1190,11 +1196,13 @@
 								if (typeof initDashboard === 'function') initDashboard();
 							}
 						}
+						_sessionChecked = true;
 						clearTimeout(_fallback);
 						_signalReady();
-					}).catch(function(){ clearTimeout(_fallback); _signalReady(); });
+					}).catch(function(){ _sessionChecked = true; clearTimeout(_fallback); _signalReady(); });
 				} else {
 					// No saved session — reveal immediately on landing
+					_sessionChecked = true;
 					_signalReady();
 				}
 			})();
