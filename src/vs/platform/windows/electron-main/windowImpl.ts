@@ -859,19 +859,15 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 					} catch (e) { return null; }
 				});
 
-		electron.ipcMain.on('vscode:livecollab-logout', async (_event, sessionId: string) => {
-			// Revoke the Clerk session server-side so the wristband is destroyed everywhere
+		electron.ipcMain.removeHandler('vscode:livecollab-logout');
+		electron.ipcMain.handle('vscode:livecollab-logout', async (_event, dbjwt: string) => {
+			// Revoke the Clerk session via our server (secret stays server-side).
+			// Server resolves the ACTUAL session from the token, never a client-supplied id. (#2)
 			try {
-				if (!sessionId) { return; }
-				const https3 = await import('https');
-				const secret3 = process.env.CLERK_SECRET_KEY || '';
-				const r = https3.request('https://api.clerk.com/v1/sessions/' + sessionId + '/revoke', {
-					method: 'POST',
-					headers: { 'Authorization': 'Bearer ' + secret3, 'Content-Type': 'application/json' }
-				}, (resp) => { resp.on('data', () => {}); resp.on('end', () => {}); });
-				r.on('error', () => {});
-				r.end();
-			} catch (e) { /* best-effort */ }
+				if (!dbjwt) { return { ok: false }; }
+				const out = await lcServerPost('/auth/logout', dbjwt);
+				return { ok: !!(out && out.ok) };
+			} catch (e) { return { ok: false }; }
 		});
 
 		electron.ipcMain.removeHandler('vscode:livecollab-mark-onboarded');

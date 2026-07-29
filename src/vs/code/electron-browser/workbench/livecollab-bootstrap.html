@@ -804,7 +804,15 @@
 		if(stCancel) stCancel.onclick=function(){ if(stConfirm) stConfirm.classList.remove('show'); };
 		var stYes=document.getElementById('st-confirm-yes');
 		if(stYes) stYes.onclick=function(){
-			try { if(window._dashSessionId && window.vscode && window.vscode.ipcRenderer) window.vscode.ipcRenderer.send('vscode:livecollab-logout', window._dashSessionId); } catch(e){}
+			var _lcLogoutTok = '';
+			try { _lcLogoutTok = localStorage.getItem('__clerk_db_jwt') || ''; } catch(e){}
+			try {
+				if (_lcLogoutTok && window.vscode && window.vscode.ipcRenderer) {
+					window.vscode.ipcRenderer.invoke('vscode:livecollab-logout', _lcLogoutTok)
+						.then(function(res){ console.log('[LiveCollab] logout:', res && res.ok); })
+						.catch(function(){});
+				}
+			} catch(e){}
 			try { localStorage.removeItem('__clerk_db_jwt'); } catch(e){}
 			window._dashFullName=''; window._dashEmail=''; window._dashProvider=''; window._dashUserId=''; window._dashSessionId=''; window._dashOnboarded=false; window._dashDisplayName='';
 			_routed=false;
