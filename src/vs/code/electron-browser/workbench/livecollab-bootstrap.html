@@ -1221,6 +1221,12 @@
 	<script type="module">
 		// ===== LiveCollab dashboard socket (Option 1: dashboard's own connection) =====
 		console.log('[LC-MODULE] before import');
+                import * as SentryDash from '../../../workbench/contrib/livecollab/browser/vendor/sentry.electron.renderer.esm.js';
+                SentryDash.init({
+                        dsn: 'https://c08142a98b008018e7b40a0699031f11@o4511821873348608.ingest.us.sentry.io/4511821905854464',
+                        sampleRate: 1.0,
+                });
+                console.log('[LiveCollab] Sentry initialized (dashboard renderer)');
 		import { io } from './socket.io.esm.min.js';
 		console.log('[LC-MODULE] after import, io =', typeof io);
 		const SERVER_URL = 'https://live-collab-production.up.railway.app';

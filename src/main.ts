@@ -10,6 +10,24 @@ import { performance } from 'node:perf_hooks';
 import { configurePortable } from './bootstrap-node.js';
 import { bootstrapESM } from './bootstrap-esm.js';
 import { app, protocol, crashReporter, Menu, contentTracing } from 'electron';
+import * as Sentry from '@sentry/electron/main';
+
+// Sentry crash/error reporting - MAIN PROCESS ONLY (Phase 0, part 1 of 2).
+// Must init BEFORE app becomes ready - Sentry registers privileged protocol
+// schemes that Electron only allows pre-ready, so this has to be here, this
+// early, or init throws.
+// sampleRate:1.0 = capture EVERY event, no client-side dropping. This is NOT
+// storm protection - sampleRate can't tell a new bug from a repeat, it just
+// randomly drops a flat % of everything. Storm/spike protection for a
+// reconnect-loop-style bug flooding events is a SEPARATE dashboard setting
+// (Sentry -> Settings -> Spike Protection / rate limits) - STILL TODO, not
+// configured by this code. Renderer init (dashboard + workbench) is also
+// still TODO - this is main-process only, half of the Phase 0 requirement.
+Sentry.init({
+	dsn: 'https://c08142a98b008018e7b40a0699031f11@o4511821873348608.ingest.us.sentry.io/4511821905854464',
+	sampleRate: 1.0,
+	tracesSampleRate: 0.1,
+});
 import minimist from 'minimist';
 import { product } from './bootstrap-meta.js';
 import { parse } from './vs/base/common/jsonc.js';

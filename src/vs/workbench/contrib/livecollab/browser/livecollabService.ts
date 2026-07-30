@@ -9,6 +9,13 @@ import { IRequestService } from '../../../../platform/request/common/request.js'
 
 const SERVER_URL = 'https://live-collab-production.up.railway.app';
 
+import * as SentryWorkbench from './vendor/sentry.electron.renderer.esm.js';
+SentryWorkbench.init({
+	dsn: 'https://c08142a98b008018e7b40a0699031f11@o4511821873348608.ingest.us.sentry.io/4511821905854464',
+	sampleRate: 1.0,
+});
+console.log('[LiveCollab] Sentry initialized (workbench renderer)');
+
 export interface ILiveCollabMember {
 	userId: string;
 	name: string;
