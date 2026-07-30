@@ -161,3 +161,21 @@ Every working session ends with:
 2. An update to this file — check off what moved, add anything newly
    discovered. This file is the plan. If it's not written here, it didn't
    happen and will get lost the way things were getting lost before it existed.
+
+---
+
+## IN PROGRESS — two blockers before Phase 0 starts
+
+**Blocker 1: Sentry vs. build-our-own — RECOMMENDED (Sentry), NOT CONFIRMED by Manny.**
+If confirmed, Phase 0 becomes "integrate @sentry/electron" instead of building
+/telemetry/error from scratch.
+
+**Blocker 2: #2 logout back-door check — TEST WRITTEN, NOT YET RUN.**
+Question: does revoking a Clerk session (what #2 does) also kill the long-lived
+dvb_ device token, or can that token still mint a fresh session after logout?
+Test: log out through the app, then immediately POST that same dvb_ token to
+/auth/token. Fresh jwt back = hole is real, #2 needs a follow-up. null/error =
+#2 confirmed solid.
+
+RULE: finish both of these before starting Phase 0. Don't leave open items
+behind to start new work.
