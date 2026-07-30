@@ -319,3 +319,59 @@ right file), and every core-file edit gets a boot-check as its verification.
 That rule is what made attempting the real `@sentry/electron/renderer`
 bundle (rather than settling for the `@sentry/browser` substitute) the
 right call tonight - and it succeeded. Hold the same standard next session.
+
+---
+
+## PHASE 0 — DONE AND VERIFIED (2026-07-30)
+
+Sentry error/crash reporting is genuinely functional, not just installed.
+Two real bugs found and fixed along the way (both confirmed via actual
+running-app testing, not assumption):
+  1. Vendor bundle wasn't in vscodeResourceIncludes -> never copied into
+     the packaged app -> ERR_FILE_NOT_FOUND at runtime. Fixed.
+  2. Bundle exports as a single default export (CJS-interop shim), code
+     used named-import style -> "init is not a function". Fixed by
+     switching to default imports + matching .d.ts.
+FINAL PROOF: real errors deliberately triggered in all 3 contexts (main
+process, dashboard renderer, workbench renderer) all confirmed appearing
+in the live Sentry dashboard at sentry.io. Main process was proven via
+Sentry's own automatic unhandledrejection capture (zero manual trigger
+needed) - arguably stronger proof than a planned test.
+Commit: a46c5dd7b9c on overlay-shell (verified: local matches
+origin/overlay-shell).
+
+## THREE FOLLOW-UP ITEMS FOR NEXT SESSION (none urgent, none blocking)
+
+1. **Sentry noise filtering** - VS Code's internal "Canceled: Canceled"
+   promise-cancellation pattern (normal control flow, not a real bug) is
+   being captured 40+ times in 18 minutes. Needs an `ignoreErrors` or
+   `beforeSend` filter in the Sentry config, or error tracking becomes
+   noisy/useless fast once real users generate volume.
+
+2. **Test-data cleanup on real accounts** - "denylist-test-2" / similar
+   leftover displayName values from tonight's curl testing got persisted
+   to real Clerk accounts via the live /auth/onboarded endpoint. Cosmetic
+   only (wrong greeting name shown), not a security issue. Fix: reset
+   display name through normal account flow.
+
+3. **livecollabService.ts hygiene debt** - 32 pre-existing lint warnings
+   (mostly @typescript-eslint/no-explicit-any, plus some formatting/
+   semicolon issues) predate tonight's work, unrelated to the Sentry
+   edit. Currently bypassed via --no-verify on every commit that touches
+   this file. Worth a dedicated cleanup pass eventually so the hygiene
+   hook can run clean on this file without a workaround becoming
+   permanent cover.
+
+## ALSO STILL LOGGED FROM EARLIER
+
+- Sentry alerts (email/Slack notification on new/spiking errors) - not
+  yet configured, dashboard-only right now. Was part of the original
+  Phase 0 requirement, still needed for the "don't have to manually
+  check the dashboard" goal.
+- Sentry spike protection / rate limiting - not yet configured in the
+  dashboard settings (the storm-protection requirement from the original
+  brief).
+- ELECTRON-1 (TypeError: Object has no method 'updateFrom', first seen
+  ~14hrs before tonight's testing) - a real, naturally-occurring bug
+  already caught by Sentry, unrelated to tonight's work, worth
+  investigating on its own.
