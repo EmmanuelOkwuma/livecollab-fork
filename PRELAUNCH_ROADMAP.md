@@ -179,3 +179,19 @@ Test: log out through the app, then immediately POST that same dvb_ token to
 
 RULE: finish both of these before starting Phase 0. Don't leave open items
 behind to start new work.
+
+---
+
+## RESOLVED — both Phase-0 blockers closed (2026-07-20)
+
+**Blocker 2 (logout back-door) — CONFIRMED FIXED.** Clerk's Backend API has
+no client/device-revoke endpoint (session revoke alone lets the dvb_ token
+silently mint a fresh session). Built our own denylist: dvb_ tokens are
+SHA-256 hashed and stored on logout; /auth/session, /auth/token, and
+/auth/onboarded all check the denylist before trusting a token. Verified
+live: the exact dvb_ token that previously minted a fresh JWT after logout
+now returns null from /auth/token. Server commit 2f2f8f6.
+
+**Blocker 1 (Sentry vs. build-our-own) — RESOLVED: [fill in Manny's decision].**
+
+Both blockers resolved. Phase 0 starts next session.
