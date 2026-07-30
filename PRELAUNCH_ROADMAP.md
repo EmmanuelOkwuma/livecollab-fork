@@ -195,3 +195,65 @@ now returns null from /auth/token. Server commit 2f2f8f6.
 **Blocker 1 (Sentry vs. build-our-own) — RESOLVED: [fill in Manny's decision].**
 
 Both blockers resolved. Phase 0 starts next session.
+
+---
+
+## STOP POINT — 2026-07-21 — Sentry Phase 0 committed as WIP, NOT verified
+
+Fork commit `513fc70ffa5` on overlay-shell. Sentry integration code exists
+(main.ts init, dashboard + workbench renderer inits via a vendored, esbuild-
+bundled `@sentry/electron/renderer`, real DSN wired in) but is NOT verified
+end to end. Do not treat Phase 0 as done.
+
+CRITICAL FINDING: the verification method used for most of tonight's compile
+checks was BROKEN. Plain `grep` silently returned 0 matches on piped compile
+output because ANSI color escape codes fragmented error text mid-string
+(e.g. "Er[31mror:" instead of "Error:"). This means several earlier
+"confirmed safe / errors isolated" claims this session may not be reliable
+and need re-checking with a working method before being trusted.
+
+## NEXT SESSION - START HERE, IN THIS EXACT ORDER:
+
+1. Fix the verification method FIRST, before checking anything else.
+   Strip ANSI codes before grepping: `sed 's/\x1b\[[0-9;]*m//g' in.txt > clean.txt`
+   then grep the clean file. Test the fixed method against text you can
+   already see with your own eyes (e.g. in a `tail` of the same file) to
+   confirm it actually works before trusting it further.
+
+2. Re-audit the full compile error list from a clean baseline using the
+   FIXED method. Get a trustworthy answer to: how many total errors, which
+   are pre-existing (extHostXaaAuthProvider.ts and similar known Microsoft/
+   Code-OSS files), and which are new/real from tonight's work.
+
+3. Investigate the windowImpl.ts unused-variable warnings specifically -
+   `userId`, `verifiedProvider`, `verifiedSessionId` at lines ~790-792, in
+   auth code touched by #1/#2 tonight. Confirm whether this is benign or a
+   real incomplete wire-up in the shipped auth fixes.
+
+4. Add an eslint-ignore for `src/**/vendor/**` (or wherever the codebase's
+   existing ignore pattern lives for socket.io.esm.min.js) so the pre-commit
+   hygiene check stops linting third-party vendored bundles as if they were
+   our own code. Confirmed cause of the 59,070-error hygiene failure tonight.
+
+5. Add a `.d.ts` type declaration for `sentry.electron.renderer.esm.js` so
+   TypeScript recognizes `init` and the SDK's other exports. The bundle
+   itself is proven to work (grep found `init` 307 times, `node --check`
+   passed clean) - this is purely a type-visibility issue for the compiler.
+
+6. THEN rebuild, boot-check the app (per the standing canonical-location
+   rule - this touched main.ts, a workbench service file, and both bootstrap
+   HTML files), and trigger three deliberate test errors (main process,
+   dashboard renderer, workbench renderer - e.g. `myUndefinedFunction()`)
+   and confirm each one shows up in the Sentry dashboard on the PACKAGED
+   build, not dev.
+
+7. ONLY THEN is Phase 0 genuinely, verifiably done. Update this file to
+   mark it complete with the confirming evidence (screenshot or description
+   of the Sentry dashboard showing all three test errors).
+
+REMINDER FROM TONIGHT'S STANDING RULE: canonical location over avoidance,
+Git is the real safety net (revert and redo, don't pre-emptively dodge the
+right file), and every core-file edit gets a boot-check as its verification.
+That rule is what made attempting the real `@sentry/electron/renderer`
+bundle (rather than settling for the `@sentry/browser` substitute) the
+right call tonight - and it succeeded. Hold the same standard next session.
