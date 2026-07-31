@@ -437,3 +437,37 @@ interim one.
 NEXT SESSION: trace the metadata-glue mechanism specifically, then build
 and test the stable-ID fix. This is real implementation work, not a
 diagnostic - deserves a fresh session.
+
+---
+
+## CORRECTION — Phase 1 on #3 is NOT finished, a second door was found (2026-07-30)
+
+The prior entry found and proved ONE door into the #3 corruption, not all
+doors. Phase 1 isn't complete until every trigger is found and understood.
+
+**Door #1 (traced, reproduced):** reconnect-during-typing. Outgoing edits
+tagged with `this.socket.id` at send; incoming echoes deduped against
+`this.socket?.id` at receive. Reconnect mints a new socket.id, an edit in
+flight during reconnect fails dedup, gets re-applied as remote, content
+duplicates. Fix direction: a STABLE MEMBER ID (not room ID - the room ID
+is already stable) that survives reconnects. Must also be checked against
+sleep/wake, network switch, server restart, and idle timeout - only
+WiFi-cut-reconnect is proven so far, the others are untested.
+
+**Door #2 (NEW, not yet traced):** leaving and re-entering a room
+duplicates content with ZERO typing - increments by exactly one copy per
+re-entry, VS Code stat metadata glued in each time. Different mechanism
+than Door #1: no reconnect or typing required. Hypothesis: the room-load
+write path (populateFromTree/loadFileContent) appends fetched content
+instead of clearing first - not yet confirmed, #3-DIAG logging (still in
+the code, marked temporary, DO NOT STRIP YET) should confirm or rule this
+out on the next reproduction.
+
+**Open question that decides Phase 2 sequencing:** does Door #2 share a
+root cause with #4 (page-reload)? If so, the overlay may fix it for free.
+Door #1 does NOT share a root with #4 and needs its own fix regardless.
+
+Phase 1 on #3 stays open until both doors are traced. Next session:
+reproduce Door #2 with #3-DIAG logging on, trace the write path, determine
+overlap with #4, test Door #1's alternate triggers, then move to Phase 2
+fix-building for whichever doors are confirmed independent.
