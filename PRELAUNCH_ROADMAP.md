@@ -375,3 +375,25 @@ origin/overlay-shell).
   ~14hrs before tonight's testing) - a real, naturally-occurring bug
   already caught by Sentry, unrelated to tonight's work, worth
   investigating on its own.
+
+---
+
+## PHASE-0 FOLLOW-UPS 1 & 2 CLOSED (2026-07-30)
+
+**Dashboard re-check:** confirmed clean on fresh launch - no
+ERR_FILE_NOT_FOUND, Sentry initializes, dashboard loads normally. The
+earlier dashboard oddness was downstream of the (now-fixed) Sentry 404,
+not a separate regression.
+
+**Display-name cleanup:** root-caused via /auth/session ground-truth
+check - displayName was "denylist-test-2" (tonight's earlier #2 back-door
+test curl had overwritten the real value on this live account, not a
+save-vs-display bug). Fixed via /auth/onboarded with the real name,
+confirmed restored on a fresh independent /auth/session read:
+displayName is genuinely "Manny" now.
+
+Remaining from Phase 0: only the livecollabService.ts pre-existing
+hygiene/any-type cleanup stays logged, low priority.
+
+Next: Phase 1 real work - #3 file-corruption timing check, #7
+phantom-rooms diagnostic.
