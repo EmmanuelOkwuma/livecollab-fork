@@ -498,3 +498,30 @@ that's diminishing returns and a way to get stuck in Phase 1 forever.
 Rare triggers we didn't anticipate will be caught in production by Sentry
 (Phase 0, now live) and reported automatically - we do not need to find
 every one by hand upfront. That's exactly what the error tracking is for.
+
+---
+
+## DOOR #2 UPDATE — room-load hypothesis ruled out (2026-07-31)
+
+New, cleaner reproduction: 3 clean leave/re-enter cycles, NO typing,
+produced exactly 3 stacked copies of the file's stat-metadata JSON as
+content (no real content at all - purer signal than the earlier mixed
+reproduction). Confirmed [#3-DIAG] logging (in populateFromTree/
+loadFileContent) did NOT fire during this test - ruling those functions
+out as Door #2's source.
+
+Door #2 is confirmed to write the file's STAT METADATA OBJECT as if it
+were CONTENT, appending one copy per room re-entry, but the actual write
+site is still unknown - it's a fourth code path, distinct from both
+Door #1 (sync-echo, livecollabEditorContribution.ts) and the room-load
+functions we instrumented.
+
+NEXT SESSION: trace the real write path. Candidates: whatever handles
+"attaching folder content to room" / "broadcasting file tree" / "file
+tree broadcast" (seen in console during room-rejoin, not yet located in
+code). Add fresh temporary logging there once found, reproduce again to
+confirm.
+
+Phase 1 on #3 remains open: Door #1 traced (fix direction known, not yet
+built), Door #2 partially characterized (behavior known, cause not yet
+located).
