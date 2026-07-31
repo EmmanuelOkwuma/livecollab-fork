@@ -471,3 +471,30 @@ Phase 1 on #3 stays open until both doors are traced. Next session:
 reproduce Door #2 with #3-DIAG logging on, trace the write path, determine
 overlap with #4, test Door #1's alternate triggers, then move to Phase 2
 fix-building for whichever doors are confirmed independent.
+
+---
+
+## PHASE 1 / #3 — DIAGNOSIS BOUNDARY RULE (do not over-hunt)
+
+Distinction that governs how long we stay in diagnosis:
+- A CAUSE is the actual broken thing in code (e.g. socket-ID dedup
+  failing on reconnect = Door #1; room-load write appending instead of
+  clearing = Door #2's hypothesis). There are only a few of these.
+- A TRIGGER is a thing that sets off a cause (WiFi reconnect, sleep/wake,
+  network switch, server restart, idle timeout). One cause can have many
+  triggers.
+
+RULE: We hunt until we've found the underlying CAUSES, not until we've
+listed every possible trigger. Fixing a cause properly fixes ALL its
+triggers at once (e.g. a stable member ID covers reconnect AND sleep AND
+network-switch, because it fixes the cause, not each trigger).
+
+So next session: trace Door #2 to its cause. That gives us two causes.
+Then a QUICK check for any obvious third CAUSE. If nothing new jumps out,
+STOP diagnosing and move to fixing (Phase 2). Do NOT run endless
+experiments hunting for more triggers of causes we already understand -
+that's diminishing returns and a way to get stuck in Phase 1 forever.
+
+Rare triggers we didn't anticipate will be caught in production by Sentry
+(Phase 0, now live) and reported automatically - we do not need to find
+every one by hand upfront. That's exactly what the error tracking is for.
