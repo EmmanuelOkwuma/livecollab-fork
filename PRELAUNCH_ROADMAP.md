@@ -397,3 +397,43 @@ hygiene/any-type cleanup stays logged, low priority.
 
 Next: Phase 1 real work - #3 file-corruption timing check, #7
 phantom-rooms diagnostic.
+
+---
+
+## PHASE 1 — #3 ROOT CAUSE STRONGLY CONFIRMED (2026-07-30)
+
+Deliberate reproduction test succeeded: forced WiFi reconnect + typing
+during the reconnect window reliably produces the "hellohello"-style
+content duplication, with real timing evidence in the console logs (not
+inferred). #3-DIAG instrumentation confirmed the room-load functions
+(populateFromTree/loadFileContent) were NOT involved - the corruption
+comes from the live sync/reconnect path.
+
+Mechanism confirmed in code: outgoing edits are tagged with
+`senderSocketId: this.socket.id` at send time; incoming echoes are
+deduped by comparing against `this.socket?.id` at receive time. Since
+reconnects mint a new socket.id (confirmed by tonight's earlier #12/#19
+work), an edit in flight during a reconnect fails the dedup check and
+gets re-applied as if it were a remote edit, duplicating the content.
+
+NEW finding: metadata-in-body (VS Code stat JSON glued into file
+content) co-occurred with the duplication in the same event this
+session - previously thought to maybe be a separate bug, now looks like
+it may share the same root cause or trigger window. Exact mechanism for
+the metadata-glue specifically is NOT yet traced.
+
+This answers Phase 1's #3 question: does corruption correlate with room
+reloads (shares root with #4) or happen independently? ANSWER: neither
+exactly - it correlates with SOCKET RECONNECTS specifically (a
+consequence of #12's fix exposing a latent assumption elsewhere), not
+room-load transitions. #3 and #4 do NOT share a root cause after all.
+
+Real fix (not yet built): dedup must use a stable ID that survives
+reconnects instead of the mutable socket.id. Note for later: this is the
+same "who authored this edit" problem Yjs/CRDT will solve properly -
+decide when Yjs work starts whether this is a permanent fix or an
+interim one.
+
+NEXT SESSION: trace the metadata-glue mechanism specifically, then build
+and test the stable-ID fix. This is real implementation work, not a
+diagnostic - deserves a fresh session.
