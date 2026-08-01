@@ -614,3 +614,37 @@ fully characterized (metadata-as-content, appended, real disk confirmed,
 LiveCollab-side code paths ruled out, next method identified). Both doors
 have a clear, specific next action. Phase 1 on #3 remains open but
 well-defined.
+
+---
+
+## DOOR #2 — SHARPENED LEAD (from user observation, 2026-08-01)
+
+Real question raised: the file IS confirmed real-disk
+(/Users/emmanuelokwuma/TEST ROOM/utils.py, Reveal-in-Finder works). But
+the editor may NOT be showing that real path normally in the breadcrumb/
+tab the way a plain real-disk file should. That inconsistency is a lead,
+not noise.
+
+Hypothesis: the file is real on disk underneath, but LiveCollab is
+displaying/routing it through a room-layer (not the plain file-explorer
+path). If there's a gap between "the real file" and "what the editor
+shows/writes through," that room-display/routing layer is a prime
+suspect for Door #2's metadata-as-content write - a better lead than
+generic "breakpoint everywhere."
+
+FIRST checks next session (in order, cheapest first):
+1. Compare the two paths directly: what the file-explorer / Reveal-in-
+   Finder shows (/Users/... confirmed) VS what the editor breadcrumb at
+   the very top shows when utils.py is open. If they DISAGREE, that
+   disagreement points straight at the routing layer where the bad write
+   likely happens.
+2. If they disagree, investigate that room-display/routing layer as the
+   Door #2 write site BEFORE falling back to broad writeFile breakpoints.
+3. Only if paths agree and no routing layer is implicated -> fall back to
+   the broad writeFile-breakpoint method across VS Code's own save/model
+   machinery.
+
+This reorders next session: check the path-display inconsistency FIRST
+(cheap, specific), breakpoints SECOND (expensive, broad). User's
+observation that "if it's real disk, why isn't the path showing on top
+of the editor like it should" is the thread to pull.
