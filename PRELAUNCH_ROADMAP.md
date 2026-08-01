@@ -525,3 +525,32 @@ confirm.
 Phase 1 on #3 remains open: Door #1 traced (fix direction known, not yet
 built), Door #2 partially characterized (behavior known, cause not yet
 located).
+
+---
+
+## DOOR #2 TRACE UPDATE — real write site still unfound, method needs to change
+
+Traced the file-tree broadcast/receive path fully: send side clean (no
+content field, no stat embedded), receive side's only consumer
+(populateFromTree) confirmed INAPPLICABLE to real-disk room-owner
+scenarios (it's virtual-scheme-only, explicitly guarded off for real
+folders) - this fully explains why #3-DIAG stayed silent, it was the
+wrong provider for this test, not a contradiction.
+
+Searched exhaustively within the livecollab contribution folder: no
+direct fileService.writeFile() calls, no editor-model listener wired to
+file-tree/room-entry events, no fourth event consumer exists anywhere.
+
+CONCLUSION: file-by-file manual tracing has reached its limit for this
+lead. Next session needs a different method - likely DevTools breakpoints
+on writeFile broadly (not just LiveCollab's own code, possibly VS Code's
+own save/model-sync machinery), OR a direct check of whether the
+corrupted file was actually on real disk vs the livecollab:// virtual
+scheme (worth confirming this basic fact before further tracing, since it
+changes which code paths are even relevant).
+
+Two causes now understood for #3: Door #1 (traced, fix known) and Door #2
+(behavior fully characterized, one code path eliminated with certainty,
+real write site still unfound). Per the diagnosis boundary rule: this
+remains reasonable diagnostic effort, not over-hunting - but the method
+needs to change next session, not just repeat more file-reading.
