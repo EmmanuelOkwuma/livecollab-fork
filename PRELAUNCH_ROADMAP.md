@@ -582,3 +582,35 @@ That one fact decides the method:
 
 A five-second path check, not a guess, decides which direction the whole
 next session goes.
+
+---
+
+## DOOR #2 — REAL DISK CONFIRMED, direction set (2026-08-01)
+
+Confirmed directly: right-clicked utils.py in Explorer, "Reveal in
+Finder" opened the actual file at /Users/emmanuelokwuma/TEST ROOM/utils.py.
+This is REAL DISK, not the livecollab:// virtual scheme.
+
+This resolves last session's #3-DIAG silence: it wasn't a mystery, it was
+simply the wrong provider - populateFromTree and the virtual filesystem
+provider genuinely don't run for real-disk rooms. Tonight's earlier
+rule-outs (the file-tree send/receive path, the three LiveCollab files
+already traced) stand.
+
+DIRECTION CONFIRMED for next session: DevTools breakpoints on writeFile /
+model-save operations broadly, across VS Code's own core machinery, not
+just LiveCollab's code - since the write is happening through something
+LiveCollab triggers indirectly (e.g. dirtying an editor model that VS
+Code's own save mechanism then writes to disk), not an explicit writeFile
+call in LiveCollab's own files (already confirmed none exist there).
+
+NEXT SESSION FIRST TASK: set up a breakpoint on writeFile in VS Code's
+core file-service code, reproduce Door #2 (leave room, re-enter,
+utils.py open), and catch the actual write in the act - what triggers it,
+what value it writes, whether it clears or appends.
+
+SESSION SUMMARY: Door #1 fully traced (fix direction known). Door #2
+fully characterized (metadata-as-content, appended, real disk confirmed,
+LiveCollab-side code paths ruled out, next method identified). Both doors
+have a clear, specific next action. Phase 1 on #3 remains open but
+well-defined.
