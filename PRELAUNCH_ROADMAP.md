@@ -554,3 +554,31 @@ Two causes now understood for #3: Door #1 (traced, fix known) and Door #2
 real write site still unfound). Per the diagnosis boundary rule: this
 remains reasonable diagnostic effort, not over-hunting - but the method
 needs to change next session, not just repeat more file-reading.
+
+---
+
+## DOOR #2 — TEST ROOM setup clarified, one fact left to check (2026-07-31)
+
+TEST ROOM setup clarified: user entered an existing room (from the 37
+uploaded), created a new folder "TEST ROOM" inside it, room:members=1
+(sole occupant, not a guest-via-code). This does NOT by itself confirm
+real-disk vs livecollab:// virtual scheme - files in an owned room can
+still be served virtually depending on how the room presents them.
+
+FIRST ACTION NEXT SESSION: check utils.py's actual path in the tab/
+breadcrumb.
+  - /Users/emmanuelokwuma/... = real disk
+  - livecollab://... = virtual scheme
+
+That one fact decides the method:
+  - REAL DISK -> writeFile breakpoints across VS Code's own save/model
+    machinery (file-by-file reading has been exhausted for this case,
+    see prior entry).
+  - VIRTUAL -> re-examine populateFromTree / the virtual filesystem
+    provider, which were only ruled out under the real-disk assumption.
+    If virtual, the #3-DIAG silence becomes a real mystery worth
+    re-investigating with code we already understand - a much shorter
+    path than starting fresh with breakpoints.
+
+A five-second path check, not a guess, decides which direction the whole
+next session goes.
