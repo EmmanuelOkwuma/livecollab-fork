@@ -648,3 +648,49 @@ This reorders next session: check the path-display inconsistency FIRST
 (cheap, specific), breakpoints SECOND (expensive, broad). User's
 observation that "if it's real disk, why isn't the path showing on top
 of the editor like it should" is the thread to pull.
+
+---
+
+## DOOR #2 — REAL LEAD FOUND: room-open is non-deterministic (2026-08-01)
+
+CORRECTION: earlier "breadcrumb inconclusive" entry was chasing the
+wrong layer. Breadcrumbs work fine (standard VS Code behavior) - they
+show path relative to whatever the "root" of the open workspace/folder
+is. That's not a bug.
+
+THE REAL FINDING: the same room (TEST ROOM) was observed opening TWO
+DIFFERENT WAYS, without the user choosing which:
+  - Sometimes wrapped in an auto-generated "Untitled (Workspace)" ->
+    breadcrumb shows full path (TEST ROOM > utils.py), because the
+    workspace is the root.
+  - Sometimes opened as a plain top-level folder directly -> breadcrumb
+    shows only the bare filename (utils.py), because the folder itself
+    is the root.
+
+This is NON-DETERMINISTIC room-opening behavior - the app is not
+consistent about which mode a room opens in, and the user has no control
+over which happens. That inconsistency is itself worth fixing regardless
+of Door #2, AND it's a strong candidate for Door #2's actual cause: if
+room-opening has a branch/race that produces two different code paths,
+one of those paths (or the inconsistency between them) is a very
+plausible place for the metadata-as-content write to live - directly
+tying "corruption happens on room entry" to "room entry is
+non-deterministic."
+
+NEXT SESSION, sharpened plan:
+1. Find what decides whether a room opens as an Untitled Workspace vs a
+   plain top-level folder - trace the actual room-open code, look for a
+   branch or condition that could resolve differently across attempts
+   (timing, race, stale state, etc.).
+2. Check whether Door #2's corruption correlates with WHICH open-mode
+   occurred - reproduce Door #2 multiple times, note which mode each
+   room-entry used, see if corruption only happens in one mode.
+3. If corruption correlates with one mode -> that mode's code path is
+   Door #2's write site, trace it directly.
+4. If corruption happens in both modes equally -> the non-determinism
+   itself is a separate bug (worth fixing anyway) but not Door #2's
+   cause; fall back to broad writeFile breakpoints.
+
+This is a better starting point than generic breakpoints - it gives a
+specific behavioral split (workspace vs plain-folder open) to correlate
+against the corruption before searching blind.
