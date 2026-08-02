@@ -728,3 +728,49 @@ inconsistently there too.
 
 Either outcome is a clean, fast resolution - this is a good, low-effort
 way to open next session.
+
+---
+
+## DOOR #2 — workspace lead CONFIRMED DEAD via proper isolation test (2026-08-01)
+
+Ran the decisive test in genuinely stock, unmodified VS Code (separate
+install, zero LiveCollab code). Opened folder "test room" with utils.py:
+first open, no "Untitled Workspace" wrapper. Removed and re-added the
+SAME folder: second time, DID wrap in "Untitled Workspace". Identical
+pattern to what was seen inside LiveCollab rooms.
+
+CONFIRMED: this is a pre-existing VS Code quirk (re-adding a folder vs
+fresh-creating one triggers different internal state/caching behavior),
+unrelated to LiveCollab. Reproduces with zero LiveCollab code involved.
+This lead is fully closed - drop it, do not investigate further.
+
+DOOR #2 investigation summary: real-disk confirmed (not virtual scheme),
+LiveCollab's own room-open code traced and cleared (no folder logic
+there), workspace-wrapping quirk confirmed as unrelated inherited VS Code
+behavior. All leads exhausted except the originally-planned method.
+
+NEXT SESSION: DevTools breakpoints on writeFile / model-save operations
+across VS Code's core save machinery. Reproduce Door #2 (leave room,
+re-enter with utils.py open), catch the actual write in the act - what
+triggers it, what value it writes, whether it clears or appends. This is
+now the only remaining method for Door #2.
+
+## SEPARATE LEAD (NOT Door #2) — lock() InvalidStateError, possibly ties to launch-hang
+
+Observed during the same session: `ERR lock() request could not be
+registered.: InvalidStateError: lock() request could not be registered.`
+This is a browser/Electron Web Locks API error - something tried to
+acquire a storage/database lock that was already held or couldn't
+register. NOT related to Door #2's file-write corruption.
+
+POSSIBLE CONNECTION worth tracking separately: this may tie to the
+already-parked launch-hang issue (earlier sessions: first launch attempt
+sometimes hangs with zero renderers, second attempt works) and the
+high-renderer-count quirk. Two processes/contexts fighting over the same
+storage lock would plausibly explain both a launch hang AND a lock
+registration error. NOT confirmed - just a plausible shared root worth
+keeping in mind if either symptom recurs.
+
+STATUS: logged, not investigated. Low priority, does not block current
+work. Revisit if launch hangs become frequent/disruptive, or if this
+error recurs and correlates with hangs.
