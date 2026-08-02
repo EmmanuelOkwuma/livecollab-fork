@@ -694,3 +694,37 @@ NEXT SESSION, sharpened plan:
 This is a better starting point than generic breakpoints - it gives a
 specific behavioral split (workspace vs plain-folder open) to correlate
 against the corruption before searching blind.
+
+---
+
+## DOOR #2 — workspace-lead traced, likely a stock VS Code quirk (2026-08-01)
+
+Traced the room-open flow completely: lcCreateRoom (dashboard, just
+calls server, no disk interaction), lcOpenRoom (just triggers a workbench
+reload via IPC, no folder logic). Searched ALL of LiveCollab's own
+contribution code for updateFolders/createFolder/showOpenDialog/
+pickFolder/executeCommand - found NOTHING beyond the single already-
+ruled-out virtual-room updateFolders call (guarded off for real-disk
+rooms).
+
+CONCLUSION: the "create new folder" action inside a real-disk room goes
+through VS Code's OWN NATIVE folder-creation commands, with ZERO
+LiveCollab code involvement in the workspace-vs-plain-folder decision.
+This means the non-deterministic open-mode is very likely a stock VS
+Code quirk, not something LiveCollab introduced - and may be UNRELATED
+to Door #2's corruption despite both occurring on room entry.
+
+NEXT SESSION FIRST TASK (cheap, decisive, good session opener): test
+whether the same workspace-vs-plain-folder inconsistency happens OUTSIDE
+any LiveCollab room - open a random unrelated local folder, use native
+"New Folder" a few times, see if "Untitled (Workspace)" appears
+inconsistently there too.
+  - Reproduces outside LiveCollab -> confirmed stock VS Code quirk,
+    unrelated to Door #2. Drop this lead, move directly to the
+    writeFile-breakpoint method (already planned).
+  - Does NOT reproduce outside LiveCollab -> real signal that something
+    LiveCollab-specific influences this even without owning the command
+    call. Worth investigating further before falling back to breakpoints.
+
+Either outcome is a clean, fast resolution - this is a good, low-effort
+way to open next session.
