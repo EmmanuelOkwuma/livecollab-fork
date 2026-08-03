@@ -803,3 +803,28 @@ NEXT SESSION PRIORITIES (in rough order):
    alternate leads exhausted)
 2. Sentry noise filter (quick, prevents real signal from being buried)
 3. ELECTRON-5 investigation (real bug, low urgency)
+
+---
+
+## DOOR #2 — MECHANISM SHARPENED: append-not-overwrite, content-agnostic (2026-08-01)
+
+New observation: typed real text before leaving/re-entering a room. On
+re-entry, BOTH the metadata blob AND the previously-typed text
+duplicated together, incrementing together on each subsequent cycle -
+not just metadata alone.
+
+REFINED HYPOTHESIS: Door #2 is likely NOT "writes metadata as content"
+specifically - it's "on room re-entry, whatever gets synced/loaded gets
+APPENDED to existing file content instead of REPLACING it," content-
+agnostic. Metadata shows up because that's often what's present when the
+file syncs; if real text is already there, it gets appended-to as well.
+
+Does NOT relate to or invalidate Door #1 (confirmed fixed - different
+trigger: typing during active reconnect while staying in-room, vs this
+observation which is about leaving/re-entering).
+
+SHARPENED TARGET for the writeFile-breakpoint trace: find the write on
+room-attach/re-entry that doesn't clear existing content first, rather
+than looking narrowly for "metadata written as content." Fix likely
+needs a genuine overwrite (clear-then-write) at whatever the real write
+site turns out to be.
