@@ -774,3 +774,32 @@ keeping in mind if either symptom recurs.
 STATUS: logged, not investigated. Low priority, does not block current
 work. Revisit if launch hangs become frequent/disruptive, or if this
 error recurs and correlates with hangs.
+
+---
+
+## DOOR #1 — CONFIRMED FIXED AND SHIPPED (2026-08-01)
+
+Nonce-based dedup replaces the broken socket.id comparison. Verified via
+4-5 separate WiFi-cut-and-type cycles, staying in-room throughout (no
+leave/re-enter, isolating from Door #2's separate mechanism), varying
+timing relative to reconnect. Zero duplication across all attempts.
+Server half deployed (live-collab main, commit a601835). Client half
+committed (fork overlay-shell, commit dbffa3e0ffc).
+
+DOOR #1: DONE.
+
+## SENTRY CHECK-IN — working, needs triage (2026-08-01)
+
+First dashboard review since Phase 0. 9 unresolved issues. Most are VS
+Code's internal "Canceled" cancellation noise (ELECTRON-2 alone: 1.1K
+events) - needs the already-logged ignoreErrors filter. One real,
+not-yet-investigated finding: ELECTRON-5, "Failed to move index.py to
+the trash (file doesn't exist)" - a genuine filesystem-state mismatch,
+worth a look. The lock() InvalidStateError (ELECTRON-8) confirmed
+recurring, ties to the already-logged possible launch-hang connection.
+
+NEXT SESSION PRIORITIES (in rough order):
+1. Door #2 - writeFile breakpoints (the one remaining method, all
+   alternate leads exhausted)
+2. Sentry noise filter (quick, prevents real signal from being buried)
+3. ELECTRON-5 investigation (real bug, low urgency)
