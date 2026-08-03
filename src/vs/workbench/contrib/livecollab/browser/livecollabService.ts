@@ -40,6 +40,7 @@ export class LiveCollabService extends Disposable {
 	private _roomName: string | undefined;
 	private _displayName: string = 'User';
 	private _myUserId: string = '';
+	private _recentlySentNonces = new Set<string>(); // bounded, see emitCodeChange (#3 Door 1 fix)
 	private _lastMembers: ILiveCollabMember[] = [];
 	private _fileCache: Map<string, string> = new Map();
 	private _connecting = false;
@@ -169,8 +170,12 @@ export class LiveCollabService extends Disposable {
 			this._lastMembers = members;
 			this._onMembersChanged.fire(members);
 		});
-		this.socket.on('code:change', (payload: { fileId: string; code: string; senderSocketId?: string }) => {
-			if (payload.senderSocketId === this.socket?.id) { return; } // ignore own changes
+		this.socket.on('code:change', (payload: { fileId: string; code: string; nonce?: string }) => {
+			// Ignore our own edits echoing back (can slip through socket.to()'s exclusion during
+			// a reconnect race - old/new socket overlap). Nonce identifies OUR emissions
+			// precisely, unlike a content-match, which could wrongly drop a real collaborator's
+			// edit that happens to match what we just sent. (#3 Door 1 fix)
+			if (payload.nonce && this._recentlySentNonces.has(payload.nonce)) { return; }
 			this._fileCache.set(payload.fileId, payload.code);
 			this._onCodeChange.fire(payload);
 		});
@@ -273,7 +278,13 @@ export class LiveCollabService extends Disposable {
 
 	emitCodeChange(roomId: string, fileId: string, code: string): void {
 		if (!this.socket?.connected) { return; }
-		this.socket.emit('code:change', { roomId, fileId, code, senderSocketId: this.socket.id });
+		const nonce = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+		this._recentlySentNonces.add(nonce);
+		if (this._recentlySentNonces.size > 20) {
+			const oldest = this._recentlySentNonces.values().next().value;
+			if (oldest !== undefined) { this._recentlySentNonces.delete(oldest); }
+		}
+		this.socket.emit('code:change', { roomId, fileId, code, nonce });
 	}
 
 	emitCursorUpdate(roomId: string, fileId: string, position: { lineNumber: number; column: number }): void {

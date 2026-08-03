@@ -49,6 +49,7 @@ export class LiveCollabFileSystemProvider extends InMemoryFileSystemProvider {
 				}
 			} else {
 				// Write empty placeholder — content loaded on demand
+				console.log('[#3-DIAG] populateFromTree WRITE-EMPTY', itemPath, 'at', Date.now(), 'hadPendingRequest:', this._pendingRequests.has(itemPath));
 				try { await this.writeFile(uri, VSBuffer.fromString('').buffer, { create: true, overwrite: true, unlock: false, atomic: false }); } catch { }
 			}
 		}
@@ -56,7 +57,10 @@ export class LiveCollabFileSystemProvider extends InMemoryFileSystemProvider {
 
 	async loadFileContent(path: string, filePath: string): Promise<void> {
 		return new Promise<void>((resolve) => {
+			const __alreadyPending = this._pendingRequests.has(path);
+			console.log('[#3-DIAG] loadFileContent START', path, 'at', Date.now(), __alreadyPending ? '*** DUPLICATE - already had a pending request for this path ***' : '(first request)');
 			this._pendingRequests.set(path, async (content: string) => {
+				console.log('[#3-DIAG] loadFileContent RESOLVE/WRITE', path, 'at', Date.now(), 'contentLength:', content.length);
 				const uri = URI.from({ scheme: LIVECOLLAB_SCHEME, authority: this._roomId, path: filePath });
 				try {
 					await this.writeFile(uri, VSBuffer.fromString(content).buffer, { create: true, overwrite: true, unlock: false, atomic: false });
