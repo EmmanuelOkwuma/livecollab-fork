@@ -828,3 +828,33 @@ room-attach/re-entry that doesn't clear existing content first, rather
 than looking narrowly for "metadata written as content." Fix likely
 needs a genuine overwrite (clear-then-write) at whatever the real write
 site turns out to be.
+
+---
+
+## DOOR #2 — DOOR2-DIAG test structurally inconclusive, real theory-test still needed (2026-08-01)
+
+Ran a sit-in-room, stay-connected WiFi-cut test with fresh instrumentation
+on onFileTree (the receive side of room:file:tree). The marker never
+fired - but this test was SOLO OCCUPANT (room:members: 1), and
+socket.to(roomId) excludes the sender from their own broadcast. A solo
+occupant structurally cannot trigger their own onFileTree handler. This
+test is INCONCLUSIVE for the "Door #2 shares Door #1's reconnect-race
+mechanism" theory - not confirmed, not ruled out.
+
+File content ("hello test") did NOT duplicate during this test (confirmed
+directly). Clean, but expected given the structural reasoning above -
+doesn't resolve the theory either way.
+
+NEW FINDINGS surfaced:
+1. Reconnect ALWAYS triggers a full file-tree re-broadcast (onConnected
+   -> _attachFolderToRoom -> _broadcastFileTree runs every time).
+2. A genuine double disconnect-reconnect cycle occurred in quick
+   succession during one WiFi toggle - likely Mac WiFi stack
+   flapping/restabilizing, not a LiveCollab bug, but reconnect handling
+   needs to tolerate this (Door #1 already tested successfully across
+   multiple real cycles, likely already robust to it).
+
+NEXT REAL TEST for the "same mechanism as Door #1" theory: requires TWO
+people actually in the room (not solo) - one reconnecting while the
+other could potentially receive a stray broadcast during the race
+window. Needs a two-machine session (e.g. with Maureen) to run properly.
