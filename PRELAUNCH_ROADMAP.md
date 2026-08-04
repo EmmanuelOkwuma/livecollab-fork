@@ -884,3 +884,41 @@ note-and-park it.
 Does not block Door #1 (done) or Door #2 (in progress) - reasonable as
 its own dedicated investigation whenever picked up. Log the fix here
 once the root cause is found.
+
+---
+
+## DOOR #2 — send-side confirmed clean (final check), pivoted to editor-restore hypothesis (2026-08-01)
+
+Re-confirmed (3rd and final time) that _attachFolderToRoom ->
+_broadcastFileTree -> _readFileTree is purely send-side, no disk write
+anywhere in the chain. Since the corruption happens on a SOLO occupant's
+OWN file during their OWN re-entry, the write must come from a different
+mechanism.
+
+NEW HYPOTHESIS (unconfirmed): VS Code's own native editor-restore
+(automatically reopening previously-open files on workspace reload) may
+be racing against something during the #4 page-reload. Checked: zero
+LiveCollab code touches editor-restore (grep across all contribution
+files came back empty). This is pure stock VS Code behavior - no
+LiveCollab anchor point exists.
+
+IMPLICATION: the write site can only be found via real DevTools
+breakpoints in VS Code's own core editor/file-loading machinery - not
+by reading more LiveCollab code, since there is none relevant here.
+
+POSSIBLE REFRAME (unconfirmed - do not treat as settled): if this
+hypothesis holds, Door #2 may not need a standalone fix - the Phase 2
+overlay (eliminates the full-page reload) could resolve it as a side
+effect. Must be verified with real breakpoints before relying on this.
+
+NEXT SESSION: two real choices, decide fresh, not tired:
+1. Do the core breakpoint trace directly (budget real time, this is
+   genuinely harder/unfamiliar territory - VS Code's own minified core,
+   likely multiple compile-test cycles).
+2. OR first cheaply check whether Door #2 correlates with the #4 reload
+   specifically - if the overlay would fix this for free, sinking hours
+   into a hard breakpoint trace may be unnecessary. This reframe is
+   worth weighing BEFORE committing to option 1.
+
+This is a genuine strategic fork, not just a technical one - decide with
+a fresh head which path is worth the investment.
