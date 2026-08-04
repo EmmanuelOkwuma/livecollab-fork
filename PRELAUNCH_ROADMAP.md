@@ -858,3 +858,29 @@ NEXT REAL TEST for the "same mechanism as Door #1" theory: requires TWO
 people actually in the room (not solo) - one reconnecting while the
 other could potentially receive a stray broadcast during the race
 window. Needs a two-machine session (e.g. with Maureen) to run properly.
+
+---
+
+## INSTANCE-COUNT / PROCESS-PILEUP — real investigation item, not just parked (2026-08-01)
+
+Raised twice now by user. Confirmed: only ONE app icon in Dock, but
+checking running processes shows ~12 (previously measured directly: 16
+"LiveCollab Helper (Renderer)" processes from a single launch, plus
+support processes - via ps aux).
+
+LIKELY SHARES A ROOT CAUSE with two other already-logged items:
+1. The high renderer-process count itself (measured, never explained).
+2. Occasional launch hangs (first attempt sometimes hangs with zero
+   renderers; retry works).
+3. Sentry-confirmed lock() InvalidStateError (Web Locks API failure).
+
+PRIORITY: affects every user's first launch experience. Higher priority
+than previously treated - deserves a real investigation session (why
+does one launch spawn ~16 renderer processes - normal Electron/VS Code
+architecture for this app, or something in LiveCollab's own code
+triggering extra window/webview creation?) rather than continuing to
+note-and-park it.
+
+Does not block Door #1 (done) or Door #2 (in progress) - reasonable as
+its own dedicated investigation whenever picked up. Log the fix here
+once the root cause is found.
