@@ -922,3 +922,32 @@ NEXT SESSION: two real choices, decide fresh, not tired:
 
 This is a genuine strategic fork, not just a technical one - decide with
 a fresh head which path is worth the investment.
+
+---
+
+## DOOR #2 — correlation answer found in EXISTING data, no new test needed (2026-08-01)
+
+Combined two already-recorded prior-session results instead of running a
+new test:
+1. Reconnect WITHOUT page reload (socket-only reconnect via
+   onConnected -> _attachFolderToRoom, confirmed NOT a page reload):
+   file did NOT duplicate.
+2. Leave-room-then-re-enter (confirmed to trigger the FULL PAGE RELOAD,
+   #4's known mechanism): RELIABLY duplicates, incrementing per cycle.
+
+CORRELATION: corruption tracks with the page reload specifically, not
+socket reconnection alone. Same _attachFolderToRoom call fires both
+times; only the reload path corrupts. This is real supporting evidence
+(not full confirmation) for the editor-restore-on-reload hypothesis.
+
+DECISION UPDATE: given this correlation, proceeding with the Phase 2
+overlay work is now the higher-leverage move over sinking hours into a
+hard VS Code core breakpoint trace. The overlay is needed for #4 anyway,
+independent of Door #2 - and there's real evidence it may resolve
+Door #2 as a side effect by eliminating the reload entirely.
+
+REVISED PLAN: build Phase 2 overlay (kills the full-page reload) ->
+re-test Door #2's leave/re-enter reproduction once the overlay ships ->
+only pursue the hard core-breakpoint trace if Door #2 STILL reproduces
+after the reload is eliminated. This could save the entire hard trace if
+the correlation holds.
