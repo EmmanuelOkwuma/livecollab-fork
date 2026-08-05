@@ -951,3 +951,37 @@ re-test Door #2's leave/re-enter reproduction once the overlay ships ->
 only pursue the hard core-breakpoint trace if Door #2 STILL reproduces
 after the reload is eliminated. This could save the entire hard trace if
 the correlation holds.
+
+---
+
+## NEXT SESSION ORDERING (locked, clear-head decisions made)
+
+Correlation confirmed from two prior sessions' data (not a new test):
+reconnect-alone stays clean, leave/re-enter (full-page reload, #4)
+reliably corrupts. Door #2 is reload-triggered. Therefore the overlay
+(kills the reload) is prioritized over a hard VS Code-core breakpoint
+trace - it's required for #4 regardless AND now has real evidence it may
+resolve Door #2 as a side effect.
+
+ORDER for next session - clear the cheap neglected items BEFORE the
+overlay swallows attention (both have slid the entire phase):
+
+1. INSTANCE-COUNT question (free, ~1 min): resolve how "12" is being
+   seen - ps aux process count (normal Electron, likely a red herring)
+   vs actual visible windows/Dock icons (real bug, ties to the lock()
+   InvalidStateError). One answer decides if this is nothing or serious.
+
+2. #7 PHANTOM ROOMS diagnostic (cheap, untouched all phase): delete a
+   room, check server state vs dashboard. Server shows it gone but
+   dashboard still lists it = stale-read (display bug). Server still has
+   it = delete not working. Self-contained, quick.
+
+3. THEN the Phase 2 overlay as dedicated multi-day work. FIRST step is
+   NOT code - it's the design doc: "what does a room own independent of
+   any connected client?" Write that before building stages 2-4. When
+   the overlay lands, immediately re-test Door #2 (leave/re-enter) - if
+   the reload correlation holds, Door #2 should be gone for free.
+
+Rationale for this order: clear the cheap, long-neglected items first so
+the multi-day overlay doesn't bury them further, then give the overlay a
+fresh dedicated start.
