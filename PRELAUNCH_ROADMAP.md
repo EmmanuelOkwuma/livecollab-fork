@@ -985,3 +985,41 @@ overlay swallows attention (both have slid the entire phase):
 Rationale for this order: clear the cheap, long-neglected items first so
 the multi-day overlay doesn't bury them further, then give the overlay a
 fresh dedicated start.
+
+---
+
+## #7 PHANTOM ROOMS — FIXED AND VERIFIED END TO END (2026-08-01)
+
+Root cause found and confirmed in code: the room-list query's WHERE
+clause had (r.deletedAt IS NULL OR m.userId IS NOT NULL) - since room
+owners are always inserted into room_members on creation (confirmed via
+an explicit code comment: "owner is also in room_members as role
+owner"), m.userId IS NOT NULL was always true for owners, meaning the
+delete filter never actually applied to the person who deleted the room.
+
+FIX: simplified to just r.deletedAt IS NULL, no exceptions. A deleted
+room is gone for everyone - owner and members alike, matching the
+intended behavior confirmed by Manny (deleted means gone, full stop).
+
+VERIFIED END TO END with real database ground truth (not just dashboard
+appearance): confirmed a room's deletedAt was null before, set to a real
+timestamp after deletion (via the actual softDeleteRoom code path, same
+as the real UI button), and confirmed the room genuinely disappeared
+from the query results after a fresh client refresh (dashRender count
+dropped 38->37 matching exactly).
+
+Temporary diagnostic endpoints used for verification (/diag/room-status,
+/diag/room-delete) have been removed and confirmed gone from the live
+server. Clean.
+
+#7 IS DONE.
+
+Server commits: ba10ad1 (the actual query fix), 308c491 (final cleanup,
+temp endpoints removed).
+
+NOTE: this was a surgical, minimal fix - one line in an existing query,
+not a new delete system. Consistent with the MVP timeline - the existing
+delete mechanism (soft-delete) now genuinely works as intended, no new
+complexity added. A fuller deletion system (grace periods, concurrent-
+deletion handling, owner-account-deleted state) remains a separate,
+later roadmap item if/when needed - not required to close #7.
