@@ -1023,3 +1023,28 @@ delete mechanism (soft-delete) now genuinely works as intended, no new
 complexity added. A fuller deletion system (grace periods, concurrent-
 deletion handling, owner-account-deleted state) remains a separate,
 later roadmap item if/when needed - not required to close #7.
+
+---
+
+## CRITICAL — SIGN-IN BROKEN, confirmed unrelated to Stage 1 (2026-08-06)
+
+Discovered during Stage 1 testing: Clerk confirms sign-in in browser,
+app never picks it up, stays on landing page.
+
+CONFIRMED via full revert-and-rebuild that Stage 1's overlay test code
+(WebContentsView, new IPC handlers) is NOT the cause - reverted
+windowImpl.ts to last committed state (confirmed clean via git status),
+rebuilt fully (~21 min), retested: sign-in STILL broken. This is a
+separate, pre-existing bug.
+
+Sentry shows NO new errors during the failed attempt - this is a SILENT
+failure (timeout/no-connection), not a crash. Likely candidate: the
+clerk-callback local HTTP server (windowImpl.ts ~line 864,
+http://127.0.0.1:PORT/clerk-callback) - port conflict, server not
+starting, or callback not reaching the app.
+
+SEVERITY: HIGH - app appears unusable for anyone not already signed in.
+
+PRIORITY SHIFT: investigating this immediately, ahead of resuming Stage
+1 overlay work. Stage 1 reverted cleanly, no work lost - design doc and
+API research remain valid, will resume once this is resolved.
