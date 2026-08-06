@@ -38,6 +38,8 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 		this._register(livecollabService.onFileTree(async ({ tree, roomName }) => {
 			const roomId = livecollabService.roomId;
 			if (!roomId) { return; }
+			console.log('[#DOOR2-DIAG] onFileTree FIRED at', Date.now(), 'tree items:', tree.length, 'roomName:', roomName);
+			console.trace('[#DOOR2-DIAG] onFileTree call stack');
 			console.log('[LiveCollab] populating virtual file system with tree:', tree.length, 'items, roomName:', roomName);
 			livecollabFileSystemProvider.setRoomId(roomId);
 			await livecollabFileSystemProvider.populateFromTree(tree);
