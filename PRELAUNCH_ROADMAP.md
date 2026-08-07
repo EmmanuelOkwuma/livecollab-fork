@@ -1092,3 +1092,43 @@ involves real user data (rooms potentially not staying deleted), higher
 stakes than developer-experience issues #1 and #2. Do not try to solve
 all three in one sitting - each deserves focused, undistracted
 investigation given how deep tonight's threads already went.
+
+---
+
+## CRITICAL — Railway SQLite database does NOT persist across deploys (2026-08-07)
+
+DEFINITIVELY PROVEN: deleted a room (confirmed via real deletedAt
+timestamp), triggered a trivial redeploy, checked again - deletedAt
+reverted to null. The database resets to its baseline on EVERY deploy.
+
+This is NOT a code bug - it's a Railway configuration issue. The SQLite
+file (server/livecollab.sqlite) is not on a persistent volume.
+
+THIS RESOLVES tonight's "38 rooms again" mystery completely: #7's fix is
+correct, the delete genuinely worked, a subsequent deploy silently
+wiped it. No code fix needed for that investigation - it's fully
+explained.
+
+MAY ALSO EXPLAIN the dual user-identity finding (two different user
+records for the same email) - if the database has been resetting on
+every deploy, a fresh account getting created after a reset (rather
+than two genuinely racing/duplicate accounts) is a plausible unifying
+explanation. Not fully confirmed but consistent with the evidence.
+
+SEVERITY: CRITICAL, HIGHEST PRIORITY. In current config, every single
+deploy destroys all user data - all rooms, all accounts, everything not
+somehow re-seeded from the git repo. This is launch-blocking.
+
+FIX NEEDED: configure a persistent volume on Railway for the SQLite
+database path, or migrate to a proper external/managed database. This
+is a Railway/infrastructure configuration task, not application code.
+
+## REVISED SESSION STATUS - four distinct issues, re-prioritized
+
+1. CRITICAL, do first: Railway database persistence (just found,
+   launch-blocking, real user data loss on every deploy).
+2. Sign-in bug - root cause understood (stale window closure), fix not
+   written.
+3. 9-window startup mystery - narrowed, cause still unknown.
+4. Dual user-identity - likely explained by #1 (database resets), not a
+   separate bug pending confirmation once #1 is fixed.
