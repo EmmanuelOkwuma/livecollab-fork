@@ -589,7 +589,7 @@ export abstract class BaseWindow extends Disposable implements IBaseWindow {
 	abstract matches(webContents: electron.WebContents): boolean;
 
 	override dispose(): void {
-		console.log('[DISPOSE-DIAG] dispose() called at', Date.now(), new Error().stack);
+		console.log('[DISPOSE-DIAG] dispose() called at', Date.now(), 'disposing window id:', this._win ? this._win.id : 'ALREADY_NULL');
 		super.dispose();
 
 		this._win = null!; // Important to dereference the window object to allow for GC
@@ -718,6 +718,7 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			// Create the browser window
 			mark('code/willCreateCodeBrowserWindow');
 			this._win = new electron.BrowserWindow(options);
+			console.log('[WINID-DIAG] CONSTRUCTOR created window id:', this._win.id, 'at', Date.now());
 			mark('code/didCreateCodeBrowserWindow');
 
 			// livecollab: show window when bootstrap signals first page is painted
