@@ -1048,3 +1048,47 @@ SEVERITY: HIGH - app appears unusable for anyone not already signed in.
 PRIORITY SHIFT: investigating this immediately, ahead of resuming Stage
 1 overlay work. Stage 1 reverted cleanly, no work lost - design doc and
 API research remain valid, will resume once this is resolved.
+
+---
+
+## NEW FINDING — dual user identity + possible room-resurrection bug (2026-08-07)
+
+Investigated "why 38 rooms again after #7 fix." NOT a #7 regression -
+#7's fix is confirmed correct. Discovered TWO different internal user
+records exist for the same email (emmanuelokwuma111@gmail.com):
+  - user_3FAI1VoL76eFPWW7snOjG9z1UjW (tested against all night, 0 rooms
+    after our #7 verification delete)
+  - 86be8f2b-d788-495d-b720-90b8ad4a5cc7 (confirmed via live server
+    logs: what the actual dashboard socket connection uses) - has 38
+    real active rooms.
+
+#7's fix was tested against the wrong user id the whole time - a real
+oversight, not a broken fix.
+
+SEPARATE, POTENTIALLY SERIOUS: room-e9079f1e-4fae-4f13-895a-1dcf9977f602
+("Test Folder") - the exact room we deliberately deleted and confirmed
+deleted during #7 verification - now shows deletedAt:null again under
+the 86be8f2b... user. Possible room-resurrection bug (suspect: an
+INSERT OR REPLACE pattern somewhere resetting deletedAt to NULL on a
+resave, not yet confirmed).
+
+ALSO UNEXPLAINED: why two user records exist for one email. Possible:
+Clerk re-linking, or a race condition from the 9-window bug (9 windows
+authenticating near-simultaneously could plausibly race in
+findOrCreateClerkUser and create duplicates).
+
+## SESSION STATUS - THREE DISTINCT OPEN ISSUES (2026-08-07)
+
+1. Sign-in bug - root cause fully understood (stale window closure from
+   9-window startup issue), fix not yet written.
+2. 9-window startup mystery - narrowed precisely (ONE open() call
+   results in 9 windows), but WHY still unknown. openConfig's cli._ and
+   urisToOpen came back empty, ruling that theory out.
+3. NEW: dual user-identity + possible room-resurrection bug - just
+   discovered, minimally investigated, touches real data integrity.
+
+RECOMMENDATION for next session: prioritize #3 first if possible - it
+involves real user data (rooms potentially not staying deleted), higher
+stakes than developer-experience issues #1 and #2. Do not try to solve
+all three in one sitting - each deserves focused, undistracted
+investigation given how deep tonight's threads already went.
