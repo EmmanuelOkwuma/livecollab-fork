@@ -1153,3 +1153,26 @@ attempt, reverted safely, server stable.
 NEXT SESSION: add RAILWAY_RUN_UID=0 in Railway's Variables tab, then
 re-attempt the RAILWAY_VOLUME_MOUNT_PATH commit+deploy, watching logs
 immediately after deploy this time.
+
+---
+
+## PERSISTENCE FIX — second attempt failed too, RAILWAY_RUN_UID=0 insufficient (2026-08-07)
+
+Set RAILWAY_RUN_UID=0, re-committed the fix properly (confirmed staged
+before committing this time). First deploy used a stale Docker cache
+(never actually ran new code). Forced cache-bust, redeployed - crashed
+again (502). Railway's dashboard showed stale deployment info both
+times, preventing us from seeing the actual crash logs.
+
+Reverted both commits - server confirmed healthy and stable again.
+
+STATUS: Two careful attempts, both failed, real crash reason still
+unknown due to Railway dashboard staleness during both attempts.
+
+RECOMMENDATION: seriously consider migrating to Postgres (already
+planned for later phases) instead of continuing to fight SQLite +
+Railway volume permission issues blind. Postgres has none of these
+problems and is more robust long-term. May be higher-leverage than a
+third attempt.
+
+Server is stable on known-working code. No data was lost.
