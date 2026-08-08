@@ -1132,3 +1132,24 @@ is a Railway/infrastructure configuration task, not application code.
 3. 9-window startup mystery - narrowed, cause still unknown.
 4. Dual user-identity - likely explained by #1 (database resets), not a
    separate bug pending confirmation once #1 is fixed.
+
+---
+
+## PERSISTENCE FIX ATTEMPT — crashed server, reverted safely (2026-08-07)
+
+Attached a Railway volume (mount path /data). The RAILWAY_VOLUME_MOUNT_PATH
+code change was written but not committed in the same turn - caught
+later, committed properly (82d4312), deployed - server crashed (502).
+Reverted immediately (bc3534e) - confirmed server healthy again.
+
+LIKELY CAUSE: Railway volumes mount as root by default; app container
+may run as non-root, lacking permission to write to /data. Known fix:
+set RAILWAY_RUN_UID=0 environment variable on the service.
+
+Database persistence bug (confirmed real, resets on every deploy) is
+STILL UNFIXED. Volume is attached, code fix caused a crash on first
+attempt, reverted safely, server stable.
+
+NEXT SESSION: add RAILWAY_RUN_UID=0 in Railway's Variables tab, then
+re-attempt the RAILWAY_VOLUME_MOUNT_PATH commit+deploy, watching logs
+immediately after deploy this time.
