@@ -1286,3 +1286,33 @@ genuine standing task, not just a note:
 Session closes here. Database is persistent and proven, ground is
 stable, next session has one clear first task: log openConfig's
 contents to find the 9-window cause.
+
+---
+
+## 9-WINDOW MYSTERY — original theory disproven, two leads ruled out (2026-08-08)
+
+CORRECTION: earlier "solved with certainty" was premature - the strong
+correlation (9 stale entries = 9 windows) was never actually tested
+causally before being declared solved.
+
+REAL TEST: fully killed all processes, cleared storage.json's
+windowsState.openedWindows to genuinely empty, confirmed empty
+immediately before launch (nothing alive to overwrite it), launched.
+RESULT: still exactly 9 windows. Theory DISPROVEN with direct evidence.
+
+Also checked and ruled out: ~/.livecollab-shared/sharedStorage/
+state.vscdb (LiveCollab's own separate storage) - only 4 keys exist,
+recentlyOpenedPathsList has just 1 entry, not 9.
+
+STATUS: 9-window root cause is genuinely still unknown. Two real leads
+tested and eliminated with evidence - real progress via elimination,
+even without the answer yet.
+
+LESSON: correlation is not causation. Only an actual intervention test
+(change the suspected cause, observe if effect changes) proves it -
+should run that test BEFORE declaring anything solved, not after.
+
+NEXT SESSION: different diagnostic approach needed. Consider adding
+debugger/instrumentation INSIDE getPathsToOpen()/doGetPathsFromLastSession()
+to inspect windowsStateHandler.state directly AT RUNTIME, rather than
+continuing to guess which on-disk file might be feeding it.
