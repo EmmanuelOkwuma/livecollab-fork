@@ -1176,3 +1176,48 @@ problems and is more robust long-term. May be higher-leverage than a
 third attempt.
 
 Server is stable on known-working code. No data was lost.
+
+---
+
+## DATABASE PERSISTENCE BUG — FIXED AND PROVEN (2026-08-08)
+
+After multiple crashes and careful debugging, the fix is confirmed
+working with real, definitive proof:
+
+1. Railway volume attached at /data, RAILWAY_RUN_UID=0 set for write
+   permissions.
+2. Code updated to use RAILWAY_VOLUME_MOUNT_PATH for the SQLite path.
+3. Fixed two real crashes discovered along the way: the migration
+   block that adds new columns (deletedAt, invitedVia, etc.) was
+   running too late in init() - AFTER queries referencing those columns
+   were already being prepared. Old database files on the volume
+   predated these columns. Fixed by moving the entire migration block
+   to run first, before any query preparation.
+
+FINAL VERIFICATION: created a genuine test room, deleted it (confirmed
+via deletedAt timestamp), triggered a real redeploy, checked again -
+deletedAt was identical, survived completely. This is the same test
+that originally proved the bug existed - now proves it's fixed.
+
+All temporary diagnostic endpoints removed, server confirmed healthy on
+clean code.
+
+SIDE EFFECT: the persistent volume started fresh/empty (the old 38-room
+dataset lived only in the previous non-persistent file). Expected and
+correct - all new data going forward genuinely persists now.
+
+ALSO CONFIRMED: the dual user-identity issue is a real, SEPARATE bug -
+NOT explained by the persistence issue (ruled out that theory during
+this test - the duplication exists in the real, now-persistent
+database too). Needs its own investigation.
+
+## ISSUE STATUS UPDATE
+
+1. Database persistence - FIXED, PROVEN. Closed.
+2. Sign-in bug - root cause understood, fix not written.
+3. 9-window startup mystery - narrowed, cause unknown.
+4. Dual user-identity - confirmed real and separate, not yet
+   investigated on its own merits.
+
+Next: return to sign-in bug and 9-window mystery on stable, trustworthy
+infrastructure. Then investigate dual-identity for real.
