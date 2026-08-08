@@ -1221,3 +1221,68 @@ database too). Needs its own investigation.
 
 Next: return to sign-in bug and 9-window mystery on stable, trustworthy
 infrastructure. Then investigate dual-identity for real.
+
+---
+
+## SENIOR-DEV SCRUTINY POINTS on the persistence fix (2026-08-08)
+
+Three real follow-up items flagged during handoff review, each a
+genuine standing task, not just a note:
+
+1. SINGLE-REPLICA CONSTRAINT: SQLite on one mounted Railway volume works
+   correctly for exactly ONE service replica. Do NOT scale to multiple
+   Railway replicas before the Phase 4 Postgres migration - a second
+   replica would mean two processes writing to the same SQLite file
+   concurrently, causing corruption/lock contention. This is fine for
+   MVP/closed-alpha, but must not be forgotten when scaling comes up.
+
+2. RAILWAY_RUN_UID=0 UNVERIFIED AS NECESSARY: this runs the container as
+   root. It was added as a theory for a permission issue, but the
+   actual crashes hit were schema-migration-ordering bugs, not
+   permission errors - so whether root was ever truly required was
+   never confirmed. TODO: once stable, test removing RAILWAY_RUN_UID=0.
+   If the server still starts cleanly without it, remove it - running
+   as root is an avoidable security tradeoff if it's not actually needed.
+
+3. MIGRATION-ORDERING CONVENTION: added an explicit code comment in
+   db.js at the migration block stating the rule (all ALTER TABLE
+   column-adds must run before any db.prepare() call, since the
+   database now persists and may pre-exist with an older schema).
+   Deployed (commit 656cc18). This is a real, standing convention to
+   maintain - the next engineer adding a migration needs to follow it
+   or risk reintroducing tonight's exact crash pattern.
+
+## FINAL PRIORITY SEQUENCE for next session (2026-08-08)
+
+1. Database persistence: DONE, VERIFIED, CLOSED. This is the stable
+   foundation everything else now builds on with confidence.
+
+2. SIGN-IN BUG - NOW THE TOP PRIORITY. Without working sign-in, no new
+   user can use the app at all. Root cause confirmed (stale window
+   closure, tied to the 9-window startup mystery). Fix not yet written.
+
+3. 9-WINDOW STARTUP MYSTERY - the root cause of the sign-in bug. Next
+   diagnostic step: log the actual CONTENTS of openConfig at the
+   windowsMainService.open() call site (cli._, urisToOpen, etc. already
+   checked and came back empty - need to look deeper at what else in
+   openConfig could cause 9 window constructions from one call).
+
+4. Once the 9-window cause is found: fix window creation, fix the
+   sign-in closure binding, verify sign-in works end to end with a real
+   test (not just "no crash" - an actual successful login reaching the
+   dashboard).
+
+5. STAGE 1 OVERLAY - paused, not lost. Design doc committed, test code
+   was written and confirmed working before the sign-in crisis pulled
+   focus. Resumes once sign-in is fixed and the 9-window mystery is
+   resolved (the overlay work touches the same window-creation code,
+   so doing it AFTER understanding the 9-window issue is safer than
+   before).
+
+6. Dual user-identity issue - confirmed real and separate from
+   persistence. Not yet investigated on its own merits. Lower priority
+   than sign-in, but a genuine data-integrity concern to return to.
+
+Session closes here. Database is persistent and proven, ground is
+stable, next session has one clear first task: log openConfig's
+contents to find the 9-window cause.
