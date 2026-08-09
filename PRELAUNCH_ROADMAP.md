@@ -1342,3 +1342,45 @@ yet been located or traced. Likely accounts for the remaining windows.
 NEXT SESSION: find and trace this second restoration step (search
 further down in windowsMainService.ts's open() function, after the
 pathsToOpen assignment already traced).
+
+---
+
+## SIGN-IN BUG — CONFIRMED FIXED (2026-08-09)
+
+With the 9-window mystery resolved (all local accumulated state cleared
+across four locations, single clean window on launch), sign-in tested
+directly and confirmed working end to end: app loads to dashboard,
+user authenticated, successfully created a real room through the normal
+UI flow.
+
+Root cause confirmed retroactively: with only one window ever created,
+there's no redundant window for the auth IPC handler to bind to, and no
+premature disposal breaking the callback.
+
+Separate, minor, already-known issue noted (not blocking): display name
+shows raw Clerk full name instead of the correct stored display name -
+a dual-code-path bug identified earlier tonight, cosmetic only.
+
+## SESSION SUMMARY — THREE CRITICAL BUGS FIXED AND VERIFIED (2026-08-09)
+
+1. DATABASE PERSISTENCE - fixed and proven (create/delete/redeploy/
+   verify test). Was launch-blocking (every deploy wiped all user data).
+2. 9-WINDOW STARTUP MYSTERY - fully solved. Root cause: accumulated
+   local dev-machine state across four separate locations (Workspaces
+   folder, workspaceStorage folder, Backups folder, storage.json's
+   windowsState), not a code bug. Confirmed via direct clean-state test:
+   exactly 1 window with everything cleared.
+3. SIGN-IN BUG - confirmed fixed as a direct consequence of #2. Tested
+   end-to-end: real login, real room creation, working correctly.
+
+REMAINING OPEN ITEMS (lower priority, not blocking):
+- Dual user-identity issue (two Clerk user IDs for one email) - real,
+  confirmed, not yet investigated.
+- Display name dual-path cosmetic bug - minor.
+- Stage 1 overlay work - paused, ready to resume with window-management
+  now properly understood.
+
+This was an extraordinarily productive session. Three genuinely
+critical bugs, each root-caused with real evidence (including two
+premature conclusions caught and corrected along the way rather than
+left standing), each confirmed fixed with direct end-to-end testing.
