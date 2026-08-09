@@ -1316,3 +1316,29 @@ NEXT SESSION: different diagnostic approach needed. Consider adding
 debugger/instrumentation INSIDE getPathsToOpen()/doGetPathsFromLastSession()
 to inspect windowsStateHandler.state directly AT RUNTIME, rather than
 continuing to guess which on-disk file might be feeding it.
+
+---
+
+## 9-WINDOW MYSTERY — real runtime data captured, second mechanism suspected (2026-08-09)
+
+Instrumented doGetPathsFromLastSession() directly - captured REAL, LIVE
+windowsStateHandler.state at the exact moment it's read.
+
+RESULT: restoreWindowsSetting: 'all', RUNTIME openedWindows count: 6
+(confirmed real restored workspaces with genuine workspace.json paths -
+the "Untitled Workspace" artifacts from earlier sessions), plus
+lastActiveWindow present.
+
+6 (or 7 with lastActiveWindow) does NOT equal 9. This live data is real
+but does not fully explain the observed 9 windows - a genuine gap of
+~2-3 windows remains.
+
+LEAD: a comment later in open() references a SEPARATE restoration step
+("Check for window.restoreWindows setting to include all windows from
+the previous session if this is the initial startup and we have not
+restored windows already otherwise") - this second mechanism has not
+yet been located or traced. Likely accounts for the remaining windows.
+
+NEXT SESSION: find and trace this second restoration step (search
+further down in windowsMainService.ts's open() function, after the
+pathsToOpen assignment already traced).
