@@ -188,7 +188,7 @@ import product from '../../platform/product/common/product.js';
 					localize('window.reopenFolders.one', "Reopen the last active window unless a folder, workspace or file is opened (e.g. from the command line). If a file is opened, it will replace any of the editors that were previously opened in a window."),
 					localize('window.reopenFolders.none', "Never reopen a window. Unless a folder or workspace is opened (e.g. from the command line), an empty window will appear.")
 				],
-				'default': 'all',
+				'default': 'none', // LiveCollab: changed from 'all' - LiveCollab is a single dashboard + one room at a time, not a multi-project dev tool. Restoring multiple windows from a previous session doesn't match the product design, and accumulated local state (crashed/force-quit sessions) could otherwise cause many redundant windows on startup, which was confirmed to break sign-in (2026-08-09).
 				'scope': ConfigurationScope.APPLICATION,
 				'description': localize('restoreWindows', "Controls how windows and editors within are being restored when opening.")
 			},
