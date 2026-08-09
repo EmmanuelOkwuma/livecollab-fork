@@ -629,11 +629,8 @@
 		descContinue.onclick = function() { show('page-vibe'); startVibe(); };
 
 	// Listen for Clerk session return from browser
-	console.log('[LISTENER-DIAG] checking window.vscode:', !!window.vscode, 'ipcRenderer:', !!(window.vscode && window.vscode.ipcRenderer));
 	if (window.vscode && window.vscode.ipcRenderer) {
-		console.log('[LISTENER-DIAG] registering clerk-user and clerk-session listeners now');
 		window.vscode.ipcRenderer.on('vscode:livecollab-clerk-user', function(_e, u) {
-			console.log('[LISTENER-DIAG] clerk-user event RECEIVED');
 				if (!u) return;
 				window._dashFullName = u.fullName || '';
 				if (u.displayName) window._dashDisplayName = u.displayName;
@@ -641,7 +638,6 @@
 				window._dashProvider = u.provider || '';
 				window._dashUserId = u.userId || '';
 				window._dashOnboarded = !!u.onboarded;
-				console.log('[ROUTE-DIAG] clerk-user IPC set _dashOnboarded to', window._dashOnboarded, 'from server data');
 				window._dashSessionId = u.sessionId || '';
 				// Prefill display-name input from Clerk full name (first name) if empty
 				try { window.dispatchEvent(new CustomEvent('livecollab:identity-ready')); } catch(e) {}
@@ -680,7 +676,6 @@
 		var attempts = 0;
 		function decide() {
 			attempts++;
-			console.log('[ROUTE-DIAG] decide() attempt', attempts, '_dashOnboarded:', window._dashOnboarded, '_sessionChecked:', window._sessionChecked, '_dashUserId:', window._dashUserId);
 			if (window._dashOnboarded === true) {
 				// Definitively onboarded -> dashboard
 				_routed = true;
@@ -747,7 +742,6 @@
 					window._dashProvider = prov || '';
 					window._dashUserId = user.id || '';
 					window._dashOnboarded = !!(user.publicMetadata && user.publicMetadata.onboarded);
-					console.log('[ROUTE-DIAG] resolveClerkUser set _dashOnboarded to', window._dashOnboarded, 'from Clerk publicMetadata:', JSON.stringify(user.publicMetadata));
 					try { window.dispatchEvent(new CustomEvent('livecollab:identity-ready')); } catch(e) {}
 					var dni = document.getElementById('display-name-input');
 					if (dni && !dni.value && fn) { dni.value = fn.split(' ')[0]; }

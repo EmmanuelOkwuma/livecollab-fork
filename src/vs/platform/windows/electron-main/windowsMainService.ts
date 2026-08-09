@@ -336,14 +336,6 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 	}
 
 	async open(openConfig: IOpenConfiguration): Promise<ICodeWindow[]> {
-		console.log('[OPEN-DIAG] windowsMainService.open() called at', Date.now(), new Error().stack);
-		try {
-			console.log('[OPENCONFIG-FULL] keys:', Object.keys(openConfig as any));
-			console.log('[OPENCONFIG-FULL] full dump:', JSON.stringify(openConfig, (key, value) => {
-				if (typeof value === 'function') { return '[Function]'; }
-				return value;
-			}, 2));
-		} catch (e) { console.log('[OPENCONFIG-FULL] failed to stringify:', e); }
 		this.logService.trace('windowsManager#open');
 
 		// Make sure addMode/removeMode is only enabled if we have an active window
@@ -586,7 +578,6 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		// Handle files to open/diff/merge or to create when we dont open a folder and we do not restore any
 		// folder/untitled from hot-exit by trying to open them in the window that fits best
 		const potentialNewWindowsCount = foldersToOpen.length + workspacesToOpen.length + emptyToRestore.length;
-		console.log('[DOOPEN-DIAG] foldersToOpen:', foldersToOpen.length, 'workspacesToOpen:', workspacesToOpen.length, 'emptyToRestore:', emptyToRestore.length, 'potentialNewWindowsCount:', potentialNewWindowsCount, 'maybeOpenEmptyWindow:', maybeOpenEmptyWindow);
 		if (filesToOpen && potentialNewWindowsCount === 0) {
 
 			// Find suitable window or folder path to open files in
@@ -1034,8 +1025,6 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 
 				// Collect previously opened windows
 				const lastSessionWindows: IWindowState[] = [];
-				console.log('[RESTORE-DIAG] restoreWindowsSetting:', restoreWindowsSetting, 'RUNTIME openedWindows count:', this.windowsStateHandler.state.openedWindows.length, 'lastActiveWindow present:', !!this.windowsStateHandler.state.lastActiveWindow);
-				console.log('[RESTORE-DIAG] RUNTIME openedWindows contents:', JSON.stringify(this.windowsStateHandler.state.openedWindows, null, 2));
 				if (restoreWindowsSetting !== 'one') {
 					lastSessionWindows.push(...this.windowsStateHandler.state.openedWindows);
 				}

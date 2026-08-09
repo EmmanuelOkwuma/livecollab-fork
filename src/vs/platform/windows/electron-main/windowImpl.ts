@@ -589,7 +589,6 @@ export abstract class BaseWindow extends Disposable implements IBaseWindow {
 	abstract matches(webContents: electron.WebContents): boolean;
 
 	override dispose(): void {
-		console.log('[DISPOSE-DIAG] dispose() called at', Date.now(), 'disposing window id:', this._win ? this._win.id : 'ALREADY_NULL');
 		super.dispose();
 
 		this._win = null!; // Important to dereference the window object to allow for GC
@@ -718,7 +717,6 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			// Create the browser window
 			mark('code/willCreateCodeBrowserWindow');
 			this._win = new electron.BrowserWindow(options);
-			console.log('[WINID-DIAG] CONSTRUCTOR created window id:', this._win.id, 'at', Date.now());
 			mark('code/didCreateCodeBrowserWindow');
 
 			// livecollab: show window when bootstrap signals first page is painted
@@ -793,11 +791,9 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 						let verifiedProvider = '';
 						let verifiedSessionId = '';
 						// Resolve user via Clerk Backend API using the dev-browser token (works fresh AND returning)
-								console.log('[AUTH-DIAG] callback received, has dbjwt:', !!dbjwt);
 								if (dbjwt) {
 									// Ask our server to resolve this user. Clerk secret stays server-side.
 									const u: any = await lcServerPost('/auth/session', dbjwt);
-									console.log('[AUTH-DIAG] lcServerPost result:', JSON.stringify(u));
 									if (u && u.userId && this._win && !this._win.isDestroyed()) {
 										this._win.webContents.send('vscode:livecollab-clerk-user', {
 											fullName: u.fullName || '',
@@ -810,12 +806,10 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 										});
 									}
 								}
-					} catch (e) { console.error('[AUTH-DIAG] exception in callback handler:', e); }
+					} catch (e) { /* ignore, still advance */ }
 					// Send callback URL to bootstrap window
-					console.log('[SEND-DIAG] about to send clerk-session, _win exists:', !!this._win, 'destroyed:', this._win ? this._win.isDestroyed() : 'n/a', 'webContents URL:', this._win && !this._win.isDestroyed() ? this._win.webContents.getURL() : 'n/a');
 					if (this._win && !this._win.isDestroyed()) {
 						this._win.webContents.send('vscode:livecollab-clerk-session', fullUrl);
-						console.log('[SEND-DIAG] clerk-session send() called successfully');
 					}
 					res.writeHead(200, { 'Content-Type': 'text/html' });
 					res.end(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>LiveCollab</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{background:#181818;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px;}h2{color:#F2F2F2;font-size:24px;font-weight:600;}p{color:#9D9D9D;font-size:14px;}span{color:#007ACC;font-weight:700;}</style></head><body><h2>You're signed in.</h2><p>Return to <span>LiveCollab</span> to continue.</p><p style="margin-top:8px;font-size:12px;color:#6E6E6E;">You can close this window.</p></body></html>`);
