@@ -39,6 +39,72 @@ Last updated: 2026-07-20 — after #2 (logout migration) shipped and verified li
 
 ---
 
+## Status Snapshot — 2026-08-09 update
+
+**Critical infrastructure fires found and fixed during Phase 2 work (not on
+the original roadmap — these weren't visible when phases were planned, found
+while testing the Phase 2 overlay, fixed before returning to it):**
+- Database persistence — the SQLite database was resetting to empty on
+  EVERY server deploy (file lived inside the app's own container, not on
+  persistent storage). This was launch-blocking: any code update would have
+  destroyed all real user data. FIXED: Railway volume attached, code points
+  at the persistent mount path, schema migration ordering corrected (two
+  real crashes hit and fixed along the way). PROVEN with a real create →
+  delete → redeploy → verify test: the same test that first exposed the bug
+  now confirms data survives deploys.
+- 9-window startup issue — the app was launching 9 duplicate windows at
+  once, most closing within seconds. Root cause: accumulated local
+  dev-machine state (stale workspace/backup folders from heavy repeated
+  testing), not a code bug — confirmed by clearing all four accumulation
+  points and getting exactly 1 window. FIXED STRUCTURALLY (not just today's
+  cleanup): changed window.restoreWindows's default from 'all' to 'none' in
+  desktop.contribution.ts, since LiveCollab is a single dashboard + one room,
+  not a multi-project dev tool. PROVEN under deliberately hostile conditions:
+  3 forced unclean shutdowns in a row, all still produced exactly 1 window.
+- Sign-in bug — silently failed with no errors anywhere. Root cause: the
+  auth IPC handler was binding to whichever of the (many, before the fix
+  above) redundant windows was constructed LAST, and that window typically
+  got disposed within seconds since it was redundant — leaving the auth
+  callback pointing at a dead window reference by the time the user finished
+  signing in. FIXED as a direct consequence of the 9-window fix above (only
+  one window now exists, so there's no redundant window to bind to and no
+  premature disposal). VERIFIED end-to-end: real login, real room creation,
+  confirmed on the final clean build.
+
+**Also closed this session (mapped to their original roadmap items below):**
+- #7 phantom rooms (Phase 1) — root cause confirmed (a query filter bug let
+  deleted rooms keep showing for their own owner), fixed, and RE-VERIFIED
+  after the persistence fix landed (the original verification had looked
+  successful but was actually undermined by the persistence bug re-wiping
+  the test data between checks — a real "looked done, wasn't" case, caught
+  and corrected).
+- #22 display name dual-path bug (Phase 6) — three separate code paths set
+  user identity data, only one read the server's real stored display name.
+  Fixed the other two. Verified independently: confirmed "Manny" is not a
+  hardcoded string anywhere in the code, and confirmed the server's own
+  endpoint (queried directly) returns the same value — not just a visual
+  check of the UI.
+
+**Investigated and explained, not a code fix:**
+- Dual user-identity (two Clerk user IDs seen for one email) — investigated
+  directly against the live database. Explanation: an artifact of the
+  database migrating from broken-persistence to fixed-persistence
+  mid-session (the old ID lived in a database file that no longer exists),
+  not an ongoing account-creation bug. Confirmed via direct query: exactly
+  1 user exists now.
+
+**New item found, not yet scheduled:**
+- Account panel settings (display name field, cursor color picker) are
+  UI-only — clicking save does not persist anything. Only logout is
+  functional on this panel. Real backend wiring needed; not yet scoped.
+
+**Honesty note on this update:** several things looked confirmed done
+tonight and weren't on first check (the #7 re-verification above, an
+earlier premature "9-window mystery solved" that a real causal test then
+disproved before the actual fix was found). Where something is fixed but
+not independently re-verified, it's marked as such below rather than
+checked off.
+
 ## PHASE 0 — Instrumentation (do first, unblocks everything after)
 
 Nothing else is safe to test at real-user scale without this. Every bug found
@@ -64,12 +130,13 @@ not scale to closed alpha.
         overlay fix (Phase 2) likely fixes both. Overlay work jumps in priority.
       - If it happens independently → #3 needs its own fast, separate
         root-cause fix before/alongside Phase 2, because it's active data loss.
-- [ ] #7 phantom rooms — is delete failing to reach the server, or is the
-      dashboard rendering stale/cached reads? Observed: room count roughly
-      stable (38-39) across sessions, not climbing — a data point suggesting
-      deletes are landing and this is a stale-read/render bug, not a broken
-      delete. Confirm with a direct check of what the server's room list
-      actually contains vs. what the dashboard renders.
+- [x] #7 phantom rooms — DONE 2026-08-08/09. Root cause was neither of the
+      two guesses above: a SQL query filter bug let deleted rooms keep
+      showing up for the account that deleted them (an OR condition meant
+      for non-owner members accidentally bypassed the delete filter for
+      owners too, since owners are always also room_members rows). Fixed
+      with a one-line query change. Re-verified after the persistence fix
+      (see Phase 4) with a real create->delete->redeploy->verify test.
 
 ## PHASE 2 — The architectural root (the big one)
 
@@ -93,6 +160,27 @@ status-bar room name, and plausibly #3.
 - [ ] Re-test the interim #4 routing patch's necessity once the overlay lands
       — it may become dead code if the reload it was mitigating no longer
       happens.
+- [x] SIDE FINDING, DONE 2026-08-08/09: while testing a Stage 1 overlay
+      prototype, discovered sign-in was completely broken (silent failure,
+      no errors anywhere). Traced through several real diagnostic rounds to
+      a root cause: the app was launching 9 duplicate windows at startup
+      (accumulated local dev-machine state, not a code bug - confirmed by
+      clearing it and getting exactly 1 window), and the auth IPC handler
+      was binding to whichever window constructed LAST, which typically got
+      disposed within seconds since it was redundant - leaving the callback
+      pointing at a dead window by the time sign-in completed. FIXED
+      STRUCTURALLY: changed window.restoreWindows's default from 'all' to
+      'none' (LiveCollab is one dashboard + one room, not a multi-project
+      tool - restoring multiple windows never matched the product). PROVEN
+      under deliberately hostile conditions (3 forced unclean shutdowns in a
+      row, still exactly 1 window each time). Sign-in itself verified
+      end-to-end after: real login, real room creation.
+      NOTE: this was a genuine emergency detour, not overlay progress. The
+      Stage 1 prototype build from this investigation was reverted (it had
+      caused a real crash, unrelated to the sign-in bug) - actual Stage 1
+      progress remains where it was before tonight (see note above: an
+      earlier confirmed-working empty mounting shell exists, stages 2-4 not
+      started).
 
 ## PHASE 3 — Data integrity
 
@@ -110,7 +198,29 @@ status-bar room name, and plausibly #3.
 
 ## PHASE 4 — Infrastructure
 
-- [ ] SQLite → Postgres migration.
+- [x] Database persistence — DONE 2026-08-08/09. CRITICAL, found during
+      Phase 2 testing, not on the original roadmap: the SQLite database
+      file lived inside the app's own deploy container (path.join(__dirname,
+      ...)), meaning EVERY server deploy wiped it back to empty. This was
+      launch-blocking - any code push would have destroyed all real user
+      data. Fixed: attached a Railway persistent volume, changed the code
+      to use RAILWAY_VOLUME_MOUNT_PATH, corrected a migration-ordering bug
+      that crashed the server on first deploy with real (pre-existing)
+      data (two real crashes hit and fixed - a missing column check that
+      ran too late in init(), fixed by moving the whole migration block
+      before any query preparation). PROVEN with the exact test that first
+      exposed the bug: create a room, delete it, redeploy, verify the
+      delete survived. It did.
+      NOT YET DONE: RAILWAY_RUN_UID=0 (added to work around a suspected
+      permission issue) was never confirmed to actually be necessary -
+      the real crashes turned out to be schema bugs, not permissions.
+      Worth testing removal once stable.
+- [ ] SQLite → Postgres migration. NOTE: the persistence fix above is a
+      real, durable fix for the CURRENT single-instance setup, not a
+      stopgap that needs urgent replacement. This migration remains
+      valuable for the reasons already listed in this phase (no multi-
+      replica support on SQLite+volume, a proper managed DB is more
+      robust long-term) but is not blocking anything right now.
 - [ ] #9 — remove the committed livecollab.sqlite file from the server git
       repo (it's real production data sitting in version control), add to
       .gitignore.
@@ -141,8 +251,19 @@ status-bar room name, and plausibly #3.
 
 - [ ] #6 — dashboard shows the wrong (workbench) menu bar.
 - [ ] #16 — cursor flickers between arrow/pointer on buttons, never settles.
-- [ ] #22 — account panel shows display name where full name should show
-      (full name is never actually erased, this is a render-order fix).
+- [x] #22 — DONE 2026-08-09. Real cause was different from the original
+      guess (not a render-order issue): three separate code paths set user
+      identity in the dashboard renderer, only one correctly read the
+      server's stored displayName - the other two either omitted the read
+      entirely or had no access to it. Fixed both. Verified independently:
+      confirmed the correct name is not hardcoded, and confirmed the
+      server's own endpoint (queried directly, bypassing the app UI)
+      returns the same value.
+- [ ] NEW 2026-08-09 — account panel settings (display name field, cursor
+      color picker) are UI-only, no backend wiring exists. Clicking save
+      does not persist any change. Only logout is functional on this panel.
+      Real feature work needed (save endpoints + state updates), not yet
+      scoped or scheduled.
 - [ ] #13/#18 — member count divergence between clients. Self-corrects on
       reconnect currently; underlying "doesn't reliably update on join/leave"
       bug is unfixed.
