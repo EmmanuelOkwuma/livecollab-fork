@@ -1384,3 +1384,27 @@ This was an extraordinarily productive session. Three genuinely
 critical bugs, each root-caused with real evidence (including two
 premature conclusions caught and corrected along the way rather than
 left standing), each confirmed fixed with direct end-to-end testing.
+
+---
+
+## #22 DISPLAY NAME DUAL-PATH BUG — FIXED (2026-08-09)
+
+Three code paths set user identity data in the dashboard, only one
+correctly read the server's stored displayName. Fixed the other two
+(check-session IPC path was missing the read entirely; resolveClerkUser
+now falls back to first-name-only, guarded to never overwrite a real
+value). Verified independently: "Manny" confirmed not hardcoded
+anywhere, server's own /auth/session endpoint confirms displayName:
+"Manny" directly, account panel now displays correctly.
+
+STATUS: CLOSED.
+
+## NEW ITEM — account panel settings are UI-only, no backend wiring (2026-08-09)
+
+User confirmed clearly: the account panel's editable fields (display
+name field, cursor color picker) do not actually save or persist
+changes - clicking save does nothing. Only "log out" is functional on
+this panel. This is real, separate feature work (not a bug in existing
+functionality) - needs actual backend wiring: save endpoints, real
+state updates connected to these UI elements. Not yet scoped or
+scheduled - flagging as a known gap for future planning.
