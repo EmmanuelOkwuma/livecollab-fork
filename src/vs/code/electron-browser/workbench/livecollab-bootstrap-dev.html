@@ -738,6 +738,7 @@
 						prov = p ? p.charAt(0).toUpperCase()+p.slice(1) : '';
 					}
 					window._dashFullName = fn || '';
+					if (!window._dashDisplayName && fn) window._dashDisplayName = fn.split(' ')[0]; // fallback: this path can't reach the server's stored display name, use first name instead of full name
 					window._dashEmail = em || '';
 					window._dashProvider = prov || '';
 					window._dashUserId = user.id || '';
@@ -1192,6 +1193,7 @@
 					window.vscode.ipcRenderer.invoke('vscode:livecollab-check-session', savedTok).then(function(u){
 						if (u && u.userId) {
 							window._dashFullName = u.fullName || '';
+							if (u.displayName) window._dashDisplayName = u.displayName;
 							window._dashEmail = u.email || '';
 							window._dashProvider = u.provider || '';
 							window._dashUserId = u.userId || '';
