@@ -297,16 +297,39 @@ export class LiveCollabService extends Disposable {
 		this.socket.emit('chat:send', { roomId, text: content, name: this._displayName });
 	}
 
-	leaveRoom(): void {
-		if (!this.socket?.connected || !this._roomId) { return; }
-		this.socket.emit('room:leave', { roomId: this._roomId });
+	// Core room-leave cleanup: server notification + local state clear.
+	// Idempotent - safe to call with no active room (early-returns).
+	//
+	// IMPORTANT: this function does NOT navigate anywhere. Navigation is
+	// the CALLER's responsibility, not this function's - this is an
+	// intentional split for Stage 2 of the overlay (PHASE2_OVERLAY_DESIGN.md
+	// section 4): the button-click path (leaveRoom(), below) still needs to
+	// go back to the dashboard, but the room-switch path (main process
+	// sending vscode:livecollab-join-room to switch from room A to room B)
+	// must NOT navigate - it needs to stay on the persistent workbench and
+	// join the new room directly. Do not add navigation back into this
+	// function - if you need navigation, add it in your own caller, the
+	// way leaveRoom() does below.
+	leaveCurrentRoom(): void {
+		if (!this._roomId) { return; }
+		if (this.socket?.connected) {
+			this.socket.emit('room:leave', { roomId: this._roomId });
+		}
 		this._roomId = undefined;
 		this._roomName = undefined;
 		this._lastMembers = [];
 		this._onMembersChanged.fire([]);
-		// Fire onRoomLeft so contributions can tear down (spec 6B)
+		// Fire onRoomLeft - livecollab.contribution.ts listens and handles all
+		// teardown (file system clear, editor close) in ONE place, avoiding a
+		// circular import between this file and livecollabFileSystemProvider.ts
+		// (which already imports THIS file). See PHASE2_OVERLAY_DESIGN.md sec 4.
 		this._onRoomLeft.fire();
-		// Navigate back to dashboard
+	}
+	leaveRoom(): void {
+		if (!this._roomId) { return; }
+		this.leaveCurrentRoom();
+		// Navigate back to dashboard - this is leaveRoom()'s own concern,
+		// NOT leaveCurrentRoom()'s. See the comment above leaveCurrentRoom().
 		const ipc = (window as any).vscode?.ipcRenderer;
 		if (ipc) { ipc.send('vscode:livecollab-load-dashboard'); }
 	}

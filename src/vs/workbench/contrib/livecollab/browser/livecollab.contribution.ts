@@ -20,6 +20,7 @@ import { IQuickInputService } from '../../../../platform/quickinput/common/quick
 import { INotificationService, Severity } from '../../../../platform/notification/common/notification.js';
 import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContainer.js';
 import { livecollabService } from './livecollabService.js';
+import { livecollabFileSystemProvider, LIVECOLLAB_SCHEME } from './livecollabFileSystemProvider.js';
 import { LiveCollabSignInInput } from './livecollabSignInInput.js';
 import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
 import './livecollabEditorContribution.js';
@@ -160,7 +161,7 @@ CommandsRegistry.registerCommand('livecollab.signIn', async (accessor) => {
 // Sign In Editor Registration
 import { IEditorResolverService, RegisteredEditorPriority } from '../../../services/editor/common/editorResolverService.js';
 import { EditorPaneDescriptor, IEditorPaneRegistry } from '../../../browser/editor.js';
-import { EditorExtensions } from '../../../common/editor.js';
+import { EditorExtensions, EditorsOrder } from '../../../common/editor.js';
 import { LiveCollabSignInEditor } from './livecollabSignInEditor.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
 
@@ -212,9 +213,23 @@ Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).regi
 
 class LiveCollabStartupOwner extends Disposable implements IWorkbenchContribution {
 	static readonly ID = 'workbench.contrib.livecollabStartupOwner';
-	constructor() {
+	constructor(
+		@IEditorService private readonly editorService: IEditorService
+	) {
 		super();
 		this._boot();
+		// Single, real listener for onRoomLeft (was fired but never listened to
+		// before Stage 2). Handles ALL room-teardown in one place: virtual
+		// filesystem clear + closing only this room's editors (filtered by
+		// LIVECOLLAB_SCHEME, never touches VS Code's own internal editors/panels).
+		// See PHASE2_OVERLAY_DESIGN.md section 4.
+		this._register(livecollabService.onRoomLeft(() => {
+			livecollabFileSystemProvider.clear();
+			const roomEditors = this.editorService.getEditors(EditorsOrder.SEQUENTIAL).filter(identifier => identifier.editor.resource?.scheme === LIVECOLLAB_SCHEME);
+			if (roomEditors.length > 0) {
+				this.editorService.closeEditors(roomEditors);
+			}
+		}));
 	}
 
 	private async _boot(): Promise<void> {
