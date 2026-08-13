@@ -188,6 +188,78 @@ This cleanup sequence needs to be a single, explicit function (e.g.
 before any of B's data is requested - not scattered inline, and not
 assumed to happen "naturally" as a side effect of joining B.
 
+## 5. Complete navigation inventory: all four loadURL() call sites (not two)
+
+Earlier drafts of this doc described two navigation paths - load-dashboard
+and load-workbench. A full trace of windowImpl.ts (2026-08-13) found FOUR
+distinct loadURL() call sites. Building the overlay against the two-path
+description would have left two live code paths unaccounted for, one of
+which (#1 below) touches sign-in - the exact area this project spent an
+entire prior session fixing. Documenting all four before implementation,
+per the standing discipline that caught a circular import and two missing
+imports earlier in Stage 2.
+
+1. **`vscode:livecollab-store-token` (alternate auth-ticket sign-in).**
+   Fires when the Clerk callback URL contains a raw `__clerk_ticket` or
+   `token` query parameter directly, instead of the normal flow (which
+   calls `resolveClerkUser()` and routes through `_dashOnboarded`/etc.).
+   Stores the token in a main-process closure variable (`_pendingToken`),
+   then `loadURL()`s STRAIGHT TO THE WORKBENCH - bypassing the dashboard
+   entirely. Offers the token back via `vscode:livecollab-get-pending-token`.
+   TRACED: this handler has NO CONSUMER. Searched the entire workbench
+   source tree - nothing calls `vscode:livecollab-get-pending-token`. The
+   workbench's own `_boot()` reads its session independently from
+   `localStorage`'s `__clerk_db_jwt`, never touching this passed token.
+   CONCLUSION: this path is functionally orphaned in current behavior -
+   it navigates to the workbench, but the workbench ignores the token it
+   was handed and re-derives its session from localStorage regardless.
+   DECISION: under the overlay, this path does NOT need its own special
+   mechanism. Route it through the same "show dashboard, dashboard's
+   normal boot logic takes it from there" path as everything else -
+   `_pendingToken` and `vscode:livecollab-get-pending-token` can be
+   eliminated entirely, not preserved. If real-world testing after this
+   change shows this path behaving differently than expected, that is
+   itself useful information (it would mean the token WAS silently doing
+   something not caught by this trace) - re-open this decision if so,
+   but do not build speculative handling for an unconsumed value.
+
+2. **`vscode:livecollab-load-dashboard`.** Already covered in section 4.
+   Under the overlay: show dashboard view, hide workbench view. No reload.
+
+3. **`vscode:livecollab-load-workbench`.** Already covered in section 4.
+   Under the overlay: send roomId/roomName directly via IPC to the
+   already-loaded workbench view, then show it, hide dashboard view.
+
+4. **Cold boot (window construction, ~line 1451).** Different in kind
+   from 1-3: this is not an IPC-triggered transition between two already-
+   existing pages, it is the FIRST page ever shown, before either
+   WebContentsView exists. Currently: `loadURL()`s the bootstrap/dashboard
+   HTML unconditionally (a `sessions` window variant aside, not relevant
+   to livecollab).
+   DECISION for the overlay: at cold boot, create BOTH WebContentsViews
+   immediately (same as Stage 1's proven mount mechanism, generalized
+   from placeholder content to real content), load the real dashboard
+   HTML into view A and the real workbench HTML into view B, show ONLY
+   view A. This means auth/onboarding still happens on the dashboard view
+   first, exactly as today - the only change is that the workbench view
+   is pre-loaded and hidden in the background, ready to be shown instantly
+   once a room is actually joined, rather than being created fresh via
+   loadURL() at that point. The user-visible cold-boot experience is
+   unchanged; what changes is that the SECOND view now exists early
+   instead of being created on demand.
+
+## Eliminating the pending-globals mechanism: what's actually eliminated
+
+Per the decision above:
+- `_livecollabPendingRoomId` / `_livecollabPendingRoomName`: eliminated,
+  replaced by direct IPC payload on `vscode:livecollab-join-room` (section 4).
+- `_pendingToken` / `vscode:livecollab-get-pending-token`: eliminated,
+  per the orphaned-consumer finding above - not replaced by anything,
+  since nothing real currently consumes it.
+- `vscode:livecollab-store-token` handler itself: also eliminated, since
+  its only job (loadURL to workbench) no longer applies - path #1 folds
+  into path #4's normal dashboard-first flow.
+
 ## Build order (from the roadmap, unchanged)
 
 Stage 1: empty BrowserView mounting shell — get two WebContents coexisting
