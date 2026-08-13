@@ -108,6 +108,86 @@ This routing logic (which WebContents owns which IPC channel, how to
 target a `sender.send()` at a specific WebContents rather than the
 window) is the concrete design surface for Stage 1's implementation.
 
+## 4. Room switching inside a persistent workbench: the _boot() problem
+
+`LiveCollabStartupOwner._boot()` (livecollab.contribution.ts) currently
+runs exactly once, triggered by LifecyclePhase.Restored when the
+workbench page first loads. It does two genuinely different things,
+mixed together in one sequential function:
+
+1. ONE-TIME SETUP: mint a Clerk auth token from the stored dvb_ JWT, set
+   the display name, connect the socket, wait for the connection to be
+   live.
+2. ROOM-SPECIFIC LOGIC: read a pending room ID (today, from the global-
+   variable workaround this doc already plans to eliminate), join that
+   room, fetch its name, fetch its members.
+
+Under a `loadURL()`-reload architecture this was never a problem — the
+whole page, and therefore the whole class instance, gets destroyed and
+recreated on every room change, so "runs once" and "runs once per room
+visit" were accidentally the same thing.
+
+**This breaks under the persistent overlay.** With the workbench
+WebContents alive for the life of the app, `_boot()` fires exactly once,
+ever. Open Room A: works correctly, `_boot()` joins it. Go back to the
+dashboard and open Room B: nothing re-triggers, because the class was
+already constructed and `_boot()` already ran. The workbench is left
+silently believing it is still in Room A - a real, load-bearing bug, not
+a cosmetic one, and it would surface on literally the second room a user
+ever opens.
+
+### The fix: split _boot() into two pieces
+
+**One-time init (fires once, unchanged from today):** mint the Clerk
+token, set the display name, connect the socket, wait for connection.
+This part is genuinely one-time - the token and socket connection are
+not room-scoped, they belong to the session as a whole.
+
+**Re-callable room-join (new):** a separate function, NOT tied to
+LifecyclePhase.Restored, that performs: leave-current-room cleanup (see
+below) → join new room → fetch room name → fetch members. This function
+runs every time the user opens a room, not just the first time.
+
+### Triggering the room-join from the main process
+
+Under the overlay, the flow becomes: main process shows the (already-
+alive) workbench WebContents and sends a NEW, dedicated IPC message
+directly to it - `vscode:livecollab-join-room`, payload `{ roomId,
+roomName }` - instead of the current `loadURL()` + global-variable
+handoff. The workbench's IPC listener for this message calls the
+re-callable room-join function above. This message can fire any number
+of times over the workbench's lifetime, once per room the user opens,
+which is the entire point of the split.
+
+### What must be cleaned up between rooms (the part most likely to cause bugs if skipped)
+
+Switching from Room A to Room B is not just "join B" - it must first
+leave A cleanly, or state bleeds across rooms. Concretely, before
+joining the new room:
+- Socket room membership: explicitly leave A's room on the socket/
+  server side (not just stop listening client-side - the server needs
+  to know this client left, for accurate member counts and to stop
+  routing A's events to a client that's no longer viewing A).
+- File tree / virtual filesystem: A's files must be cleared from the
+  in-memory `InMemoryFileSystemProvider`-based virtual filesystem before
+  B's files populate it. Leaving A's tree present would let a user
+  briefly (or not-so-briefly, if something fails silently) see or edit
+  A's files while believing they're in B.
+- Open editors / active file: any editor tabs open to A's files must be
+  closed. A stale tab pointing at a file that no longer belongs to the
+  currently-joined room is a real correctness hazard, not just visual
+  clutter - it's the same shape of bug as #3's file corruption, applied
+  to room identity instead of content.
+- Room-scoped UI state: room name display, member list/avatars, any
+  per-room settings or panel state must reset to B's values, not
+  continue showing A's until B's data arrives and happens to overwrite
+  it.
+
+This cleanup sequence needs to be a single, explicit function (e.g.
+`leaveCurrentRoom()`) called at the start of the room-join handler,
+before any of B's data is requested - not scattered inline, and not
+assumed to happen "naturally" as a side effect of joining B.
+
 ## Build order (from the roadmap, unchanged)
 
 Stage 1: empty BrowserView mounting shell — get two WebContents coexisting
