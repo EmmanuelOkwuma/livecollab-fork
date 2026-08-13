@@ -719,6 +719,60 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			this._win = new electron.BrowserWindow(options);
 			mark('code/didCreateCodeBrowserWindow');
 
+			// livecollab: STAGE 1 OVERLAY TEST (temporary, isolated) - proves two
+			// WebContentsView instances can coexist under this._win.contentView with
+			// add/remove toggling, without touching real dashboard/workbench logic.
+			// Triggered ONLY by explicit test IPC, invisible to normal app flow.
+			// See PHASE2_OVERLAY_DESIGN.md. Rebuilt 2026-08-12 (original was
+			// reverted along with an unrelated crash during earlier testing).
+			let _overlayTestViewA: electron.WebContentsView | undefined;
+			let _overlayTestViewB: electron.WebContentsView | undefined;
+			let _overlayTestActiveIsA = true;
+			electron.ipcMain.on('vscode:livecollab-test-overlay-mount', () => {
+				if (!this._win || this._win.isDestroyed()) { return; }
+				try {
+					_overlayTestViewA = new electron.WebContentsView();
+					_overlayTestViewB = new electron.WebContentsView();
+					const bounds = this._win.getContentBounds();
+					_overlayTestViewA.setBounds({ x: 0, y: 0, width: bounds.width, height: bounds.height });
+					_overlayTestViewB.setBounds({ x: 0, y: 0, width: bounds.width, height: bounds.height });
+					_overlayTestViewA.webContents.loadURL('data:text/html,<body style="background:%23ff4444;color:white;font-size:40px;font-family:sans-serif;display:flex;align-items:center;justify-content:center;margin:0;height:100vh;">VIEW A</body>');
+					_overlayTestViewB.webContents.loadURL('data:text/html,<body style="background:%234444ff;color:white;font-size:40px;font-family:sans-serif;display:flex;align-items:center;justify-content:center;margin:0;height:100vh;">VIEW B</body>');
+					this._win.contentView.addChildView(_overlayTestViewA);
+					_overlayTestActiveIsA = true;
+					// WebContentsView does NOT auto-resize with the window - must manually track it.
+					// Confirmed via real user testing 2026-08-12: without this, the view stays
+					// frozen at its mount-time size even after fullscreen/resize, leaving the
+					// real window content visible around it. Real finding for Stage 2 too.
+					this._win.on('resize', () => {
+						if (!this._win || this._win.isDestroyed()) { return; }
+						const b = this._win.getContentBounds();
+						_overlayTestViewA?.setBounds({ x: 0, y: 0, width: b.width, height: b.height });
+						_overlayTestViewB?.setBounds({ x: 0, y: 0, width: b.width, height: b.height });
+					});
+					console.log('[OVERLAY-TEST] mounted view A and B, A visible on top, resize listener attached');
+				} catch (e) {
+					console.error('[OVERLAY-TEST] mount failed:', e);
+				}
+			});
+			electron.ipcMain.on('vscode:livecollab-test-overlay-toggle', () => {
+				if (!this._win || this._win.isDestroyed() || !_overlayTestViewA || !_overlayTestViewB) { return; }
+				try {
+					if (_overlayTestActiveIsA) {
+						this._win.contentView.removeChildView(_overlayTestViewA);
+						this._win.contentView.addChildView(_overlayTestViewB);
+						_overlayTestActiveIsA = false;
+						console.log('[OVERLAY-TEST] toggled to view B');
+					} else {
+						this._win.contentView.removeChildView(_overlayTestViewB);
+						this._win.contentView.addChildView(_overlayTestViewA);
+						_overlayTestActiveIsA = true;
+						console.log('[OVERLAY-TEST] toggled to view A');
+					}
+				} catch (e) {
+					console.error('[OVERLAY-TEST] toggle failed:', e);
+				}
+			});
 			// livecollab: show window when bootstrap signals first page is painted
 			electron.ipcMain.once('vscode:livecollab-ready', (_event) => {
 				if (this._win && !this._win.isDestroyed()) {

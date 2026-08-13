@@ -153,10 +153,19 @@ status-bar room name, and plausibly #3.
 - [ ] Write a short state-ownership design doc BEFORE building: what does a
       room own independent of any connected client? What lives on the server
       as authoritative vs. what's derived client-side on load?
-- [ ] Build stages 2-4 of the overlay (stage 1 — an empty mounting shell —
-      already exists and is confirmed working in logs: "dashboard overlay
-      mounted"). Make dashboard + room a persistent layer, kill the full
-      page reload.
+- [ ] Build stages 2-4 of the overlay. Stage 1 REBUILT AND RE-TESTED
+      2026-08-12 (the earlier one referenced here was gone by this point -
+      reverted along with an unrelated crash weeks prior, confirmed via
+      grep before rebuilding). Two WebContentsView instances (isolated
+      placeholder content, mount/toggle via temporary test-only IPC),
+      confirmed working end-to-end by direct user testing: mount, toggle,
+      and resize-tracking under slow/fast/corner dragging and fullscreen.
+      REAL FINDING kept for Stage 2: WebContentsView does NOT auto-resize
+      with its parent window - must attach an explicit resize listener and
+      manually update bounds, or the view freezes at its mount-time size.
+      Minor cosmetic note: brief corner shimmer under very fast simultaneous
+      width+height dragging (native compositing lag, not a functional bug).
+      Make dashboard + room a persistent layer, kill the full page reload.
 - [ ] Re-test the interim #4 routing patch's necessity once the overlay lands
       — it may become dead code if the reload it was mitigating no longer
       happens.
@@ -177,10 +186,9 @@ status-bar room name, and plausibly #3.
       end-to-end after: real login, real room creation.
       NOTE: this was a genuine emergency detour, not overlay progress. The
       Stage 1 prototype build from this investigation was reverted (it had
-      caused a real crash, unrelated to the sign-in bug) - actual Stage 1
-      progress remains where it was before tonight (see note above: an
-      earlier confirmed-working empty mounting shell exists, stages 2-4 not
-      started).
+      caused a real crash, unrelated to the sign-in bug). Stage 1 was
+      SEPARATELY rebuilt and confirmed working 2026-08-12 (see PHASE 2
+      above) - stages 2-4 not started.
 
 ## PHASE 3 — Data integrity
 
