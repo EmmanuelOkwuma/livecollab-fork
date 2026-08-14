@@ -719,111 +719,88 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			this._win = new electron.BrowserWindow(options);
 			mark('code/didCreateCodeBrowserWindow');
 
-			// livecollab: STAGE 1 OVERLAY TEST (temporary, isolated) - proves two
-			// WebContentsView instances can coexist under this._win.contentView with
-			// add/remove toggling, without touching real dashboard/workbench logic.
-			// Triggered ONLY by explicit test IPC, invisible to normal app flow.
-			// See PHASE2_OVERLAY_DESIGN.md. Rebuilt 2026-08-12 (original was
-			// reverted along with an unrelated crash during earlier testing).
-			let _overlayTestViewA: electron.WebContentsView | undefined;
-			let _overlayTestViewB: electron.WebContentsView | undefined;
-			let _overlayTestActiveIsA = true;
-			electron.ipcMain.on('vscode:livecollab-test-overlay-mount', () => {
+			// livecollab: Stage 2 overlay - two persistent WebContentsViews
+			// (dashboard + workbench), created once at boot, never destroyed or
+			// reloaded. Replaces the old loadURL()-per-transition architecture.
+			// See PHASE2_OVERLAY_DESIGN.md sections 4-5 for the full navigation
+			// inventory and decisions this implements. Builds on Stage 1's
+			// proven mount/resize mechanism (real user tested 2026-08-12).
+			// Both views need the SAME webPreferences (preload script, sandbox
+			// args) as the main window itself, or window.vscode.ipcRenderer never
+			// gets set up in their pages - real bug found 2026-08-13: dashboard
+			// rendered visually (HTML/CSS fine) but every button and the real
+			// room-list fetch silently did nothing, since neither could reach
+			// the IPC bridge without this.
+			const dashboardView = new electron.WebContentsView({ webPreferences });
+			const workbenchView = new electron.WebContentsView({ webPreferences });
+			const applyOverlayBounds = () => {
 				if (!this._win || this._win.isDestroyed()) { return; }
-				try {
-					_overlayTestViewA = new electron.WebContentsView();
-					_overlayTestViewB = new electron.WebContentsView();
-					const bounds = this._win.getContentBounds();
-					_overlayTestViewA.setBounds({ x: 0, y: 0, width: bounds.width, height: bounds.height });
-					_overlayTestViewB.setBounds({ x: 0, y: 0, width: bounds.width, height: bounds.height });
-					_overlayTestViewA.webContents.loadURL('data:text/html,<body style="background:%23ff4444;color:white;font-size:40px;font-family:sans-serif;display:flex;align-items:center;justify-content:center;margin:0;height:100vh;">VIEW A</body>');
-					_overlayTestViewB.webContents.loadURL('data:text/html,<body style="background:%234444ff;color:white;font-size:40px;font-family:sans-serif;display:flex;align-items:center;justify-content:center;margin:0;height:100vh;">VIEW B</body>');
-					this._win.contentView.addChildView(_overlayTestViewA);
-					_overlayTestActiveIsA = true;
-					// WebContentsView does NOT auto-resize with the window - must manually track it.
-					// Confirmed via real user testing 2026-08-12: without this, the view stays
-					// frozen at its mount-time size even after fullscreen/resize, leaving the
-					// real window content visible around it. Real finding for Stage 2 too.
-					this._win.on('resize', () => {
-						if (!this._win || this._win.isDestroyed()) { return; }
-						const b = this._win.getContentBounds();
-						_overlayTestViewA?.setBounds({ x: 0, y: 0, width: b.width, height: b.height });
-						_overlayTestViewB?.setBounds({ x: 0, y: 0, width: b.width, height: b.height });
-					});
-					console.log('[OVERLAY-TEST] mounted view A and B, A visible on top, resize listener attached');
-				} catch (e) {
-					console.error('[OVERLAY-TEST] mount failed:', e);
-				}
-			});
-			electron.ipcMain.on('vscode:livecollab-test-overlay-toggle', () => {
-				if (!this._win || this._win.isDestroyed() || !_overlayTestViewA || !_overlayTestViewB) { return; }
-				try {
-					if (_overlayTestActiveIsA) {
-						this._win.contentView.removeChildView(_overlayTestViewA);
-						this._win.contentView.addChildView(_overlayTestViewB);
-						_overlayTestActiveIsA = false;
-						console.log('[OVERLAY-TEST] toggled to view B');
-					} else {
-						this._win.contentView.removeChildView(_overlayTestViewB);
-						this._win.contentView.addChildView(_overlayTestViewA);
-						_overlayTestActiveIsA = true;
-						console.log('[OVERLAY-TEST] toggled to view A');
-					}
-				} catch (e) {
-					console.error('[OVERLAY-TEST] toggle failed:', e);
-				}
-			});
+				const b = this._win.getContentBounds();
+				dashboardView.setBounds({ x: 0, y: 0, width: b.width, height: b.height });
+				workbenchView.setBounds({ x: 0, y: 0, width: b.width, height: b.height });
+			};
+			applyOverlayBounds();
+			this._win.on('resize', applyOverlayBounds);
+			const overlayBootstrapUrl = FileAccess.asBrowserUri(
+				`vs/code/electron-browser/workbench/livecollab-bootstrap${this.environmentMainService.isBuilt ? '' : '-dev'}.html`
+			).toString(true);
+			const overlayWorkbenchUrl = FileAccess.asBrowserUri(
+				`vs/code/electron-browser/workbench/workbench${this.environmentMainService.isBuilt ? '' : '-dev'}.html`
+			).toString(true);
+			// IMPORTANT: add both views as children BEFORE calling loadURL() on
+			// either. A security check in app.ts (isAllowedVsCodeFileRequest)
+			// only allows vscode-file:// page loads from views it recognizes as
+			// children of a known window - if loadURL() fires before the view is
+			// added, the request is blocked (ERR_BLOCKED_BY_CLIENT, real all-
+			// white boot, discovered and fixed 2026-08-13). workbenchView is
+			// added FIRST (bottom, invisible), dashboardView SECOND (top,
+			// visible) - Electron's add order determines stacking, last added
+			// wins. This also means workbenchView is genuinely pre-loaded and
+			// hidden from the very start, not just "created" - matching the
+			// design doc's intent exactly.
+			this._win.contentView.addChildView(workbenchView);
+			this._win.contentView.addChildView(dashboardView);
+			// NOT '#dashboard' - that hash tells the page to skip straight to the
+			// dashboard UI without checking sign-in state at all (real bug found
+			// 2026-08-14: dashboard showed even with an expired/cleared token,
+			// completely non-functional, because this hash bypassed the check
+			// entirely). Load with NO hash so the page runs its real sign-in
+			// check on cold boot, same as it always has.
+			dashboardView.webContents.loadURL(overlayBootstrapUrl);
+			workbenchView.webContents.loadURL(overlayWorkbenchUrl);
+			// TEMPORARY diagnostic 2026-08-13: --open-devtools=true opens devtools
+			// on this._win.webContents, which no longer shows any content since
+			// Stage 2 moved everything into these child views. Open it directly
+			// on dashboardView instead so real console errors are visible.
+			dashboardView.webContents.openDevTools({ mode: 'detach' });
+			// Relies on both pages sharing localStorage (same vscode-file://
+			// origin, no session partition override - confirmed 2026-08-13) so
+			// the workbench's independent auth read from localStorage works
+			// correctly even though it loads before sign-in necessarily completes.
 			// livecollab: show window when bootstrap signals first page is painted
 			electron.ipcMain.once('vscode:livecollab-ready', (_event) => {
 				if (this._win && !this._win.isDestroyed()) {
 					this._win.show();
 				}
 			});
-
-			// livecollab: receive token from bootstrap — hold in memory only (never disk)
-			let _pendingToken: string | undefined;
-			electron.ipcMain.once('vscode:livecollab-store-token', (_event, token: string) => {
-				_pendingToken = token;
-				if (this._win && !this._win.isDestroyed()) {
-					const workbenchUrl = FileAccess.asBrowserUri(
-						`vs/code/electron-browser/workbench/workbench${this.environmentMainService.isBuilt ? '' : '-dev'}.html`
-					).toString(true);
-					this._win.loadURL(workbenchUrl);
-				}
-			});
+			// livecollab: dashboard <-> workbench navigation, Stage 2 overlay style
+			// - show/hide between the two persistent views above, no loadURL(),
+			// no reload. Eliminates the old pending-globals workaround entirely
+			// (PHASE2_OVERLAY_DESIGN.md section 5) - room data goes straight to
+			// the already-loaded workbench view via direct IPC.
 			electron.ipcMain.on('vscode:livecollab-load-dashboard', () => {
-                        if (this._win && !this._win.isDestroyed()) {
-                                const bootstrapUrl = FileAccess.asBrowserUri(
-                                        `vs/code/electron-browser/workbench/livecollab-bootstrap${this.environmentMainService.isBuilt ? '' : '-dev'}.html`
-                                ).toString(true);
-                                this._win.loadURL(bootstrapUrl + '#dashboard');
-                        }
-                });
-                        electron.ipcMain.on('vscode:livecollab-load-workbench', async (_event, payload: { roomId?: string } | string) => {
-                        // Store the roomId so the workbench can retrieve it on startup
-                        const roomId = typeof payload === 'string' ? payload : (payload && payload.roomId) || '';
-                        const roomName = (typeof payload === 'object' && (payload as any)?.roomName) || '';
-                        (global as any)._livecollabPendingRoomId = roomId;
-                        (global as any)._livecollabPendingRoomName = roomName;
-                        if (this._win && !this._win.isDestroyed()) {
-                                const workbenchUrl = FileAccess.asBrowserUri(
-                                        `vs/code/electron-browser/workbench/workbench${this.environmentMainService.isBuilt ? '' : '-dev'}.html`
-                                ).toString(true);
-                                this._win.loadURL(workbenchUrl);
-                        }
-                });
-                        electron.ipcMain.removeHandler('vscode:livecollab-get-pending-roomid');
-                        electron.ipcMain.handle('vscode:livecollab-get-pending-roomid', (_event) => {
-                        const roomId = (global as any)._livecollabPendingRoomId;
-                        (global as any)._livecollabPendingRoomId = undefined;
-                        return roomId || null;
-                });
-                        electron.ipcMain.removeHandler('vscode:livecollab-get-pending-roomname');
-                        electron.ipcMain.handle('vscode:livecollab-get-pending-roomname', (_event) => {
-                        const roomName = (global as any)._livecollabPendingRoomName;
-                        (global as any)._livecollabPendingRoomName = undefined;
-                        return roomName || null;
-                });
+				if (!this._win || this._win.isDestroyed()) { return; }
+				this._win.contentView.removeChildView(workbenchView);
+				this._win.contentView.addChildView(dashboardView);
+			});
+			electron.ipcMain.on('vscode:livecollab-load-workbench', (_event, payload: { roomId?: string; roomName?: string } | string) => {
+				if (!this._win || this._win.isDestroyed()) { return; }
+				const roomId = typeof payload === 'string' ? payload : (payload && payload.roomId) || '';
+				const roomName = (typeof payload === 'object' && payload && payload.roomName) || '';
+				workbenchView.webContents.send('vscode:livecollab-join-room', { roomId, roomName });
+				this._win.contentView.removeChildView(dashboardView);
+				this._win.contentView.addChildView(workbenchView);
+			});
                         electron.ipcMain.removeHandler('vscode:livecollab-get-pending-reset-token');
                         electron.ipcMain.handle('vscode:livecollab-get-pending-reset-token', (_event) => {
 			const resetToken = (global as any)._livecollabPendingResetToken;
@@ -848,8 +825,8 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 								if (dbjwt) {
 									// Ask our server to resolve this user. Clerk secret stays server-side.
 									const u: any = await lcServerPost('/auth/session', dbjwt);
-									if (u && u.userId && this._win && !this._win.isDestroyed()) {
-										this._win.webContents.send('vscode:livecollab-clerk-user', {
+									if (u && u.userId && !dashboardView.webContents.isDestroyed()) {
+										dashboardView.webContents.send('vscode:livecollab-clerk-user', {
 											fullName: u.fullName || '',
 											email: u.email || '',
 											provider: u.provider || '',
@@ -861,9 +838,11 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 									}
 								}
 					} catch (e) { /* ignore, still advance */ }
-					// Send callback URL to bootstrap window
-					if (this._win && !this._win.isDestroyed()) {
-						this._win.webContents.send('vscode:livecollab-clerk-session', fullUrl);
+					// Send callback URL to bootstrap window (real content lives in
+					// dashboardView now, not this._win.webContents - real bug found
+					// 2026-08-14: sign-in silently never delivered to the actual page)
+					if (!dashboardView.webContents.isDestroyed()) {
+						dashboardView.webContents.send('vscode:livecollab-clerk-session', fullUrl);
 					}
 					res.writeHead(200, { 'Content-Type': 'text/html' });
 					res.end(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>LiveCollab</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{background:#181818;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px;}h2{color:#F2F2F2;font-size:24px;font-weight:600;}p{color:#9D9D9D;font-size:14px;}span{color:#007ACC;font-weight:700;}</style></head><body><h2>You're signed in.</h2><p>Return to <span>LiveCollab</span> to continue.</p><p style="margin-top:8px;font-size:12px;color:#6E6E6E;">You can close this window.</p></body></html>`);
@@ -889,20 +868,21 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 						}, (resp) => {
 							let d = '';
 							resp.on('data', (c) => d += c);
-							resp.on('end', () => { try { resolve(JSON.parse(d)); } catch (e) { resolve(null); } });
+							resp.on('end', () => { console.log('[SERVERPOST-DIAG] path:', path, 'statusCode:', resp.statusCode, 'raw body:', d); try { resolve(JSON.parse(d)); } catch (e) { console.log('[SERVERPOST-DIAG] JSON parse failed:', e); resolve(null); } });
 						});
-						r.on('error', () => resolve(null));
+						r.on('error', (e) => { console.log('[SERVERPOST-DIAG] network error:', e); resolve(null); });
 						r.write(payload); r.end();
-					} catch (e) { resolve(null); }
+					} catch (e) { console.log('[SERVERPOST-DIAG] outer exception:', e); resolve(null); }
 				}); }
 				electron.ipcMain.removeHandler('vscode:livecollab-mint-token');
 				electron.ipcMain.handle('vscode:livecollab-mint-token', async (_event, dbjwt: string) => {
 					// Ask our server to mint the Clerk session JWT. Secret stays server-side.
 					try {
-						if (!dbjwt) { return null; }
+						if (!dbjwt) { console.log('[MINT-DIAG] no dbjwt provided'); return null; }
 						const out = await lcServerPost('/auth/token', dbjwt);
+						console.log('[MINT-DIAG] server response:', JSON.stringify(out));
 						return (out && out.jwt) ? out.jwt : null;
-					} catch (e) { return null; }
+					} catch (e) { console.log('[MINT-DIAG] exception:', e); return null; }
 				});
 				electron.ipcMain.removeHandler('vscode:livecollab-check-session');
 				electron.ipcMain.handle('vscode:livecollab-check-session', async (_event, dbjwt: string) => {
@@ -940,19 +920,17 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			electron.shell.openExternal(url);
 		});
 
-		// Receive Clerk session URL after browser auth completes
+		// Receive Clerk session URL after browser auth completes (same bug as
+		// above - real content lives in dashboardView, not this._win.webContents)
 		electron.ipcMain.on('vscode:livecollab-clerk-session', (_event, sessionUrl: string) => {
-			if (this._win && !this._win.isDestroyed()) {
-				this._win.webContents.send('vscode:livecollab-clerk-session', sessionUrl);
+			if (!dashboardView.webContents.isDestroyed()) {
+				dashboardView.webContents.send('vscode:livecollab-clerk-session', sessionUrl);
 			}
 		});
 
-		electron.ipcMain.removeHandler('vscode:livecollab-get-pending-token');
-		electron.ipcMain.handle('vscode:livecollab-get-pending-token', (_event) => {
-				const token = _pendingToken;
-				_pendingToken = undefined;
-				return token;
-			});
+		// livecollab: get-pending-token handler REMOVED 2026-08-13 - orphaned,
+		// had no real consumer anywhere in the workbench source. See
+		// PHASE2_OVERLAY_DESIGN.md section 5.
 
 			this._id = this._win.id;
 			this.setWin(this._win, options);

@@ -3,7 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { app, BrowserWindow, desktopCapturer, Details, GPUFeatureStatus, powerMonitor, protocol, screen as electronScreen, session, Session, systemPreferences, WebFrameMain } from 'electron';
+import { app, BrowserWindow, desktopCapturer, Details, GPUFeatureStatus, powerMonitor, protocol, screen as electronScreen, session, Session, systemPreferences, WebContentsView, WebFrameMain } from 'electron';
 import { addUNCHostToAllowlist, disableUNCAccessRestrictions } from '../../base/node/unc.js';
 import { validatedIpcMain } from '../../base/parts/ipc/electron-main/ipcMain.js';
 import { hostname, release } from 'os';
@@ -316,6 +316,20 @@ export class CodeApplication extends Disposable {
 			for (const window of windows) {
 				if (frame.processId === window.webContents.mainFrame.processId) {
 					return true;
+				}
+				// livecollab: Stage 2 overlay uses persistent WebContentsView
+				// children (dashboard + workbench) instead of loading content
+				// directly into the window's own webContents. Those children
+				// get their own separate process, so the check above alone
+				// blocks all their vscode-file:// requests. THIS is the real,
+				// correct function for vscode-file:// checks (confirmed via
+				// diagnostic logging 2026-08-13 - an earlier attempt mistakenly
+				// edited isAllowedWebviewRequest instead, a different, nearby
+				// function used for vscode-webview:// checks, not this scheme).
+				for (const child of window.contentView.children) {
+					if (child instanceof WebContentsView && frame.processId === child.webContents.mainFrame.processId) {
+						return true;
+					}
 				}
 			}
 

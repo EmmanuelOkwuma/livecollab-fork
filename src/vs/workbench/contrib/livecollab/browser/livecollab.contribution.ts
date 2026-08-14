@@ -234,7 +234,13 @@ class LiveCollabStartupOwner extends Disposable implements IWorkbenchContributio
 
 	private async _boot(): Promise<void> {
 		try {
-			// Mint a real Clerk session JWT for the socket
+			// Mint a real Clerk session JWT for the socket - ONE-TIME, fires
+			// once per workbench lifetime (LifecyclePhase.Restored). Does NOT
+			// join any room - see _joinRoom() below for the re-callable part,
+			// triggered by vscode:livecollab-join-room IPC on every room open.
+			// Split from the original single _boot() per
+			// PHASE2_OVERLAY_DESIGN.md section 4 - a persistent workbench needs
+			// room-joining to be re-callable, not one-time.
 			const ipc = (window as any).vscode?.ipcRenderer;
 			if (!ipc) { return; }
 			const dvbJwt = (() => { try { return localStorage.getItem('__clerk_db_jwt') || ''; } catch { return ''; } })();
@@ -244,7 +250,6 @@ class LiveCollabStartupOwner extends Disposable implements IWorkbenchContributio
 			const displayName = (window as any)._dashDisplayName || (window as any)._dashFullName || 'User';
 			livecollabService.setToken(clerkJwt);
 			(livecollabService as any)._displayName = displayName;
-			const roomId = await ipc.invoke('vscode:livecollab-get-pending-roomid') as string | null;
 			await livecollabService.connect();
 			console.log('[LiveCollab] workbench connected with Clerk token');
 			// Wait for socket to actually be connected before joining
@@ -253,18 +258,29 @@ class LiveCollabStartupOwner extends Disposable implements IWorkbenchContributio
 				const d = livecollabService.onConnected(() => { d.dispose(); resolve(); });
 				setTimeout(resolve, 3000); // safety timeout
 			});
-			if (roomId) {
-				await livecollabService.joinExistingRoom(roomId);
-				console.log('[LiveCollab] joined room:', roomId);
-				// Get room name passed from dashboard via IPC
-				try {
-					const roomName = await ipc.invoke('vscode:livecollab-get-pending-roomname') as string | null;
-					if (roomName) { (livecollabService as any)._roomName = roomName; }
-				} catch {}
-				setTimeout(() => livecollabService.fetchMembers(roomId), 500);
-			}
+			// Listen for room-join requests from the main process - fires every
+			// time the user opens a room, not just once. Replaces the old
+			// one-time get-pending-roomid/get-pending-roomname IPC invokes -
+			// roomId/roomName now arrive directly as the event payload.
+			ipc.on('vscode:livecollab-join-room', (_event: unknown, payload: { roomId?: string; roomName?: string }) => {
+				this._joinRoom(payload?.roomId, payload?.roomName);
+			});
 		} catch (e) {
 			console.error('[LiveCollab] startup error:', e);
+		}
+	}
+	private async _joinRoom(roomId: string | undefined, roomName: string | undefined): Promise<void> {
+		if (!roomId) { return; }
+		try {
+			// Leave whatever room we're currently in first - idempotent, safe
+			// if none. See PHASE2_OVERLAY_DESIGN.md section 4.
+			livecollabService.leaveCurrentRoom();
+			await livecollabService.joinExistingRoom(roomId);
+			console.log('[LiveCollab] joined room:', roomId);
+			if (roomName) { (livecollabService as any)._roomName = roomName; }
+			setTimeout(() => livecollabService.fetchMembers(roomId), 500);
+		} catch (e) {
+			console.error('[LiveCollab] room-join error:', e);
 		}
 	}
 }
