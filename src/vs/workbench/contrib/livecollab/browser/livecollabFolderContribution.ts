@@ -87,7 +87,7 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 			for (const uri of saved.openFileUris) {
 				if (saved.activeFileUri && uri.toString() === saved.activeFileUri.toString()) { continue; } // open active file last, below
 				try {
-					await this.editorService.openEditor({ resource: uri }, { pinned: true, preserveFocus: true });
+					await this.editorService.openEditor({ resource: uri, options: { pinned: true, preserveFocus: true } });
 				} catch (e) {
 					console.warn('[LiveCollab] could not restore file (may no longer exist):', uri.toString(), e);
 				}
