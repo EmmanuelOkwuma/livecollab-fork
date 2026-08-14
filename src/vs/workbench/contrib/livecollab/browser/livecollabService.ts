@@ -5,9 +5,22 @@
 import { Emitter, Event } from '../../../../base/common/event.js';
 import { Disposable } from '../../../../base/common/lifecycle.js';
 import { IRequestService } from '../../../../platform/request/common/request.js';
+import { URI } from '../../../../base/common/uri.js';
 
 
 const SERVER_URL = 'https://live-collab-production.up.railway.app';
+// Scenario 1 (same-session room switching) saved state. See
+// PHASE2_OVERLAY_DESIGN.md section 6. Deliberately minimal - only the
+// fields decided as in-scope (folder path, open files, active file), not
+// cursor/scroll position (deferred) and not virtual filesystem state
+// (handled separately via the existing fileSystemProvider.clear() +
+// server refetch on join).
+export interface RoomState {
+	folderUri: URI | undefined;
+	folderName: string | undefined;
+	openFileUris: URI[];
+	activeFileUri: URI | undefined;
+}
 
 import SentryWorkbench from './vendor/sentry.electron.renderer.esm.js';
 SentryWorkbench.init({
@@ -74,8 +87,21 @@ export class LiveCollabService extends Disposable {
 
 	private readonly _onMemberJoined = this._register(new Emitter<void>());
 
-	private readonly _onRoomLeft = this._register(new Emitter<void>());
-	readonly onRoomLeft: Event<void> = this._onRoomLeft.event;
+	// Carries the roomId that was just left, so listeners can save that
+	// room's state before it's gone. Changed from Event<void> 2026-08-14 -
+	// confirmed safe, both existing listeners use zero-parameter callbacks.
+	private readonly _onRoomLeft = this._register(new Emitter<string>());
+	readonly onRoomLeft: Event<string> = this._onRoomLeft.event;
+	// Fires when a room join succeeds, carrying the room ID, so listeners
+	// (livecollabFolderContribution.ts) can restore any saved state for
+	// THIS specific room. See PHASE2_OVERLAY_DESIGN.md section 6.
+	private readonly _onRoomJoined = this._register(new Emitter<string>());
+	readonly onRoomJoined: Event<string> = this._onRoomJoined.event;
+	// In-memory, per-room saved state for Scenario 1 (same-session room
+	// switching). Keyed by roomId. Intentionally NOT persisted to disk -
+	// lost on app quit, which is correct, documented behavior (Scenario 2,
+	// cross-session persistence, is explicitly out of scope for Stage 2).
+	private readonly _roomStates = new Map<string, RoomState>();
 	readonly onMemberJoined: Event<void> = this._onMemberJoined.event;
 
 	private readonly _onFileTree = this._register(new Emitter<{ tree: any[], roomName: string }>());
@@ -213,7 +239,14 @@ export class LiveCollabService extends Disposable {
 		if (!this.socket?.connected) { return; }
 		this._roomId = roomId;
 		return new Promise((resolve) => {
-			this.socket.emit('room:join', { roomId, displayName: this._displayName, colorIndex: 0 }, (res: any) => { if (res?.userId) { this._myUserId = res.userId; } resolve(); });
+			this.socket.emit('room:join', { roomId, displayName: this._displayName, colorIndex: 0 }, (res: any) => {
+				if (res?.userId) { this._myUserId = res.userId; }
+				// Fire onRoomJoined so listeners (livecollabFolderContribution.ts)
+				// can restore any Scenario 1 saved state for THIS room. See
+				// PHASE2_OVERLAY_DESIGN.md section 6.
+				this._onRoomJoined.fire(roomId);
+				resolve();
+			});
 		});
 	}
 
@@ -312,18 +345,34 @@ export class LiveCollabService extends Disposable {
 	// way leaveRoom() does below.
 	leaveCurrentRoom(): void {
 		if (!this._roomId) { return; }
+		// Capture before clearing - listeners need to know WHICH room to
+		// save state for (see PHASE2_OVERLAY_DESIGN.md section 6).
+		const leftRoomId = this._roomId;
 		if (this.socket?.connected) {
-			this.socket.emit('room:leave', { roomId: this._roomId });
+			this.socket.emit('room:leave', { roomId: leftRoomId });
 		}
 		this._roomId = undefined;
 		this._roomName = undefined;
 		this._lastMembers = [];
 		this._onMembersChanged.fire([]);
-		// Fire onRoomLeft - livecollab.contribution.ts listens and handles all
-		// teardown (file system clear, editor close) in ONE place, avoiding a
-		// circular import between this file and livecollabFileSystemProvider.ts
-		// (which already imports THIS file). See PHASE2_OVERLAY_DESIGN.md sec 4.
-		this._onRoomLeft.fire();
+		// Fire onRoomLeft - livecollab.contribution.ts and
+		// livecollabFolderContribution.ts listen and handle all teardown
+		// (file system clear, editor close, and now state-save for restore)
+		// in their own places, avoiding a circular import between this file
+		// and livecollabFileSystemProvider.ts (which already imports THIS
+		// file). See PHASE2_OVERLAY_DESIGN.md sections 4 and 6.
+		this._onRoomLeft.fire(leftRoomId);
+	}
+	// Scenario 1 save/restore access (PHASE2_OVERLAY_DESIGN.md section 6).
+	// This class only STORES the data - the actual save/restore ACTIONS
+	// (reading/writing real folders and editors) live in
+	// livecollabFolderContribution.ts, which has the needed service
+	// injections this plain class does not.
+	saveRoomState(roomId: string, state: RoomState): void {
+		this._roomStates.set(roomId, state);
+	}
+	getRoomState(roomId: string): RoomState | undefined {
+		return this._roomStates.get(roomId);
 	}
 	leaveRoom(): void {
 		if (!this._roomId) { return; }

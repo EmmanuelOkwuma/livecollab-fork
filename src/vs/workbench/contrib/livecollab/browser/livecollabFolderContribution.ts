@@ -11,6 +11,8 @@ import { livecollabFileSystemProvider, LIVECOLLAB_SCHEME } from './livecollabFil
 import { IWorkspaceEditingService } from '../../../services/workspaces/common/workspaceEditing.js';
 import { IFileService } from '../../../../platform/files/common/files.js';
 import { URI } from '../../../../base/common/uri.js';
+import { IEditorService } from '../../../services/editor/common/editorService.js';
+import { EditorsOrder } from '../../../common/editor.js';
 
 export class LiveCollabFolderContribution extends Disposable implements IWorkbenchContribution {
 
@@ -20,6 +22,7 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 		@IWorkspaceContextService private readonly workspaceContextService: IWorkspaceContextService,
 		@IFileService private readonly fileService: IFileService,
 		@IWorkspaceEditingService private readonly workspaceEditingService: IWorkspaceEditingService,
+		@IEditorService private readonly editorService: IEditorService,
 	) {
 		super();
 
@@ -38,12 +41,63 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 		// Room 1's folder was still showing after switching to Room 2). No
 		// stored reference to "the room's folder" exists anywhere in this
 		// codebase - read the live workspace state at leave-time instead.
-		this._register(livecollabService.onRoomLeft(() => {
+		this._register(livecollabService.onRoomLeft((leftRoomId) => {
 			const folders = this.workspaceContextService.getWorkspace().folders;
 			const realFolderIndex = folders.findIndex(f => f.uri.scheme !== LIVECOLLAB_SCHEME);
+			// Scenario 1 (PHASE2_OVERLAY_DESIGN.md section 6): save this room's
+			// state BEFORE clearing, so it can be restored on re-entry in the
+			// same session. Real folder + open real (non-livecollab://) files.
+			const realFolder = realFolderIndex !== -1 ? folders[realFolderIndex] : undefined;
+			const openRealEditors = this.editorService.getEditors(EditorsOrder.SEQUENTIAL)
+				.map(identifier => identifier.editor.resource)
+				.filter((uri): uri is URI => !!uri && uri.scheme !== LIVECOLLAB_SCHEME);
+			const activeUri = this.editorService.activeEditor?.resource;
+			livecollabService.saveRoomState(leftRoomId, {
+				folderUri: realFolder?.uri,
+				folderName: realFolder?.name,
+				openFileUris: openRealEditors,
+				activeFileUri: (activeUri && activeUri.scheme !== LIVECOLLAB_SCHEME) ? activeUri : undefined
+			});
 			if (realFolderIndex !== -1) {
 				console.log('[LiveCollab] room left - removing attached real folder');
 				this.workspaceEditingService.updateFolders(realFolderIndex, 1);
+			}
+		}));
+
+		// Scenario 1 restore: when a room join succeeds, re-apply any saved
+		// state for THIS specific room. No-op for a room with no saved state
+		// (correctly matches Scenario 3 - a genuinely new/different room).
+		// Stale-state handling is a correctness requirement, not polish: a
+		// saved file may no longer exist (deleted, moved) - each file open
+		// is attempted independently and failures are skipped silently, never
+		// thrown, so one stale file cannot break restoring the rest.
+		this._register(livecollabService.onRoomJoined(async (joinedRoomId) => {
+			const saved = livecollabService.getRoomState(joinedRoomId);
+			if (!saved) { return; }
+			// Folder first, then files - files opening from a folder that isn't
+			// yet in the workspace is inconsistent even if technically possible.
+			if (saved.folderUri) {
+				try {
+					const currentCount = this.workspaceContextService.getWorkspace().folders.length;
+					await this.workspaceEditingService.updateFolders(currentCount, 0, [{ uri: saved.folderUri }]);
+				} catch (e) {
+					console.warn('[LiveCollab] could not restore saved folder (may no longer exist):', e);
+				}
+			}
+			for (const uri of saved.openFileUris) {
+				if (saved.activeFileUri && uri.toString() === saved.activeFileUri.toString()) { continue; } // open active file last, below
+				try {
+					await this.editorService.openEditor({ resource: uri }, { pinned: true, preserveFocus: true });
+				} catch (e) {
+					console.warn('[LiveCollab] could not restore file (may no longer exist):', uri.toString(), e);
+				}
+			}
+			if (saved.activeFileUri) {
+				try {
+					await this.editorService.openEditor({ resource: saved.activeFileUri });
+				} catch (e) {
+					console.warn('[LiveCollab] could not restore active file (may no longer exist):', saved.activeFileUri.toString(), e);
+				}
 			}
 		}));
 
