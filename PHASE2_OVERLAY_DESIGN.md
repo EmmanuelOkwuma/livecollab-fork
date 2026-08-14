@@ -260,6 +260,83 @@ Per the decision above:
   its only job (loadURL to workbench) no longer applies - path #1 folds
   into path #4's normal dashboard-first flow.
 
+## 6. Room isolation vs. room persistence: two distinct requirements, only one was designed
+
+Real user testing 2026-08-14 surfaced a genuine gap in the original room-
+switching design (section 4): it correctly specified CLEARING room state
+on leave (for isolation between rooms), but never distinguished this from
+PERSISTING a room's state so returning to it restores where you left off.
+These are different requirements that were conflated into one behavior
+("clear on leave"), which is correct for one case and wrong for the other.
+
+### Three scenarios, only one currently unhandled correctly
+
+1. **Switch to a different room in the same running session.** Open
+   Room A, work in it, open Room B. Room A's state should be preserved
+   (the app process never died, nothing was lost) and restored exactly
+   when Room A is re-opened, even though Room B was shown in between.
+   Room B loads correctly empty/fresh. NOT CURRENTLY HANDLED - this is
+   the gap found via testing: Room A's folder/files were cleared
+   unconditionally on leave, with no save, so returning to Room A shows
+   nothing, identical to how Room B would look.
+
+2. **Quit the app entirely, later reopen the same room.** Requires
+   state to survive past the process's own lifetime - durable storage
+   (server-side or local disk), not memory. Real, unresolved product
+   questions come with this (what if the file no longer exists? what if
+   opened from a different machine? what if the room owner changed
+   something in the meantime?) that should not be decided under time
+   pressure mid-Stage-2.
+   DECISION: OUT OF SCOPE for Stage 2. This is a real, separate feature
+   for a later phase - named here so it is not silently lost, not
+   bolted onto the overlay rebuild without proper design attention.
+
+3. **Quit the app, later open a DIFFERENT room.** Already correct,
+   confirmed by testing: fresh room shows fresh state, no leakage.
+
+### Why "just don't clear, just hide" (the obvious-seeming fix) does not work here
+
+The natural first instinct - since the whole point of the overlay is a
+persistent process, why not just hide the view on leave instead of
+clearing it, and the state "persists automatically" - does not apply to
+this specific architecture. There is only ONE workbench WebContentsView
+total, shared by every room, not one view per room. Switching rooms
+means swapping content INSIDE that single shared view via the join-room
+IPC message, not switching between separate, independently-preserved
+views. If leaving Room A did not clear its state before Room B's
+content loaded into that same shared view, Room B would show Room A's
+leftover files mixed in - reintroducing the exact room-isolation bug
+already fixed. Clearing on leave is necessary given this architecture,
+not a mistake to simply undo.
+
+### The real fix: in-memory save before clear, restore on re-entry
+
+Scenario 1 requires capturing a room's relevant state into memory
+BEFORE the existing clear-on-leave logic runs, keyed by room ID, and
+re-applying it when that same room is re-entered. This is bounded (in-
+memory only, intentionally lost on app quit - acceptable, honest
+behavior, not a bug) and does not require new durable storage.
+
+**What state to save, decided explicitly rather than saving everything
+available:**
+- Real folder path (the disk folder attached to the room, if any) - YES,
+  save and restore. This is the concrete gap found by testing.
+- Which files were open in the editor - YES, save and restore. Directly
+  observed as broken (file tabs stayed open across rooms with no
+  corresponding folder, an inconsistent, confusing state - worse than
+  either fully clearing or fully restoring).
+- Which file was actively focused - YES, minor addition once the above
+  two exist, cheap to include.
+- Cursor position / scroll position - NOT NOW. Nice-to-have polish,
+  meaningfully more complex to capture and restore correctly, deferred.
+- Virtual filesystem state (livecollab:// scheme, for guest-viewed
+  rooms) - SEPARATE, ALREADY HANDLED. `fileSystemProvider.clear()` is
+  already called on leave for this; virtual room content is re-fetched
+  fresh from the server on re-join via the existing onFileTree flow,
+  which is the correct, already-working model for that case (server is
+  authoritative for shared room content, unlike a personally-attached
+  real folder which has no server-side representation to refetch from).
+
 ## Build order (from the roadmap, unchanged)
 
 Stage 1: empty BrowserView mounting shell — get two WebContents coexisting

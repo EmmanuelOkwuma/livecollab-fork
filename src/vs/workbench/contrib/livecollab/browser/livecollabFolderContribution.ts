@@ -29,6 +29,24 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 			this._attachFolderToRoom();
 		}));
 
+		// When leaving a room - remove any REAL (non-livecollab://) workspace
+		// folder that was attached to it. Room isolation gap found 2026-08-14:
+		// opening a real folder to attach content to a room is the CORRECT,
+		// intended mechanism (see _attachFolderToRoom's own comment below) -
+		// but nothing previously closed that folder on leave, so it stayed
+		// visibly open across different rooms (confirmed by real user testing:
+		// Room 1's folder was still showing after switching to Room 2). No
+		// stored reference to "the room's folder" exists anywhere in this
+		// codebase - read the live workspace state at leave-time instead.
+		this._register(livecollabService.onRoomLeft(() => {
+			const folders = this.workspaceContextService.getWorkspace().folders;
+			const realFolderIndex = folders.findIndex(f => f.uri.scheme !== LIVECOLLAB_SCHEME);
+			if (realFolderIndex !== -1) {
+				console.log('[LiveCollab] room left - removing attached real folder');
+				this.workspaceEditingService.updateFolders(realFolderIndex, 1);
+			}
+		}));
+
 		// Register livecollab:// file system provider
 		this.fileService.registerProvider(LIVECOLLAB_SCHEME, livecollabFileSystemProvider);
 
