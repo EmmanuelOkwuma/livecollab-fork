@@ -44,13 +44,18 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 		this._register(livecollabService.onRoomLeft((leftRoomId) => {
 			const folders = this.workspaceContextService.getWorkspace().folders;
 			const realFolderIndex = folders.findIndex(f => f.uri.scheme !== LIVECOLLAB_SCHEME);
-			// Scenario 1 (PHASE2_OVERLAY_DESIGN.md section 6): save this room's
-			// state BEFORE clearing, so it can be restored on re-entry in the
-			// same session. Real folder + open real (non-livecollab://) files.
 			const realFolder = realFolderIndex !== -1 ? folders[realFolderIndex] : undefined;
-			const openRealEditors = this.editorService.getEditors(EditorsOrder.SEQUENTIAL)
-				.map(identifier => identifier.editor.resource)
-				.filter((uri): uri is URI => !!uri && uri.scheme !== LIVECOLLAB_SCHEME);
+			// Real (non-livecollab://) editor identifiers - needed for BOTH
+			// saving (their resource URIs, for Scenario 1 restore per
+			// PHASE2_OVERLAY_DESIGN.md section 6) AND closing (the full
+			// identifiers, with groupId, required by closeEditors()). REAL GAP
+			// found 2026-08-14: this listener previously saved state and
+			// removed the folder, but never actually closed the open real file
+			// tabs - confirmed by direct testing (clean leave via UI, not a
+			// force-kill, the tab still persisted on next room open).
+			const realEditorIdentifiers = this.editorService.getEditors(EditorsOrder.SEQUENTIAL)
+				.filter(identifier => identifier.editor.resource && identifier.editor.resource.scheme !== LIVECOLLAB_SCHEME);
+			const openRealEditors = realEditorIdentifiers.map(identifier => identifier.editor.resource!);
 			const activeUri = this.editorService.activeEditor?.resource;
 			livecollabService.saveRoomState(leftRoomId, {
 				folderUri: realFolder?.uri,
@@ -58,6 +63,9 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 				openFileUris: openRealEditors,
 				activeFileUri: (activeUri && activeUri.scheme !== LIVECOLLAB_SCHEME) ? activeUri : undefined
 			});
+			if (realEditorIdentifiers.length > 0) {
+				this.editorService.closeEditors(realEditorIdentifiers);
+			}
 			if (realFolderIndex !== -1) {
 				console.log('[LiveCollab] room left - removing attached real folder');
 				this.workspaceEditingService.updateFolders(realFolderIndex, 1);
