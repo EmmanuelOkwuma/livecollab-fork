@@ -773,6 +773,10 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			// Stage 2 moved everything into these child views. Open it directly
 			// on dashboardView instead so real console errors are visible.
 			dashboardView.webContents.openDevTools({ mode: 'detach' });
+			// TEMPORARY diagnostic 2026-08-14: also open DevTools for the
+			// workbench view, since LiveCollabFolderContribution's restore-
+			// logging runs there, not in the dashboard's console.
+			workbenchView.webContents.openDevTools({ mode: 'detach' });
 			// Relies on both pages sharing localStorage (same vscode-file://
 			// origin, no session partition override - confirmed 2026-08-13) so
 			// the workbench's independent auth read from localStorage works

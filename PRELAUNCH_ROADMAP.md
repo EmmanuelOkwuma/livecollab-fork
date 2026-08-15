@@ -153,7 +153,8 @@ status-bar room name, and plausibly #3.
 - [ ] Write a short state-ownership design doc BEFORE building: what does a
       room own independent of any connected client? What lives on the server
       as authoritative vs. what's derived client-side on load?
-- [ ] Build stages 2-4 of the overlay. Stage 1 REBUILT AND RE-TESTED
+- [x] Build stages 2-4 of the overlay - DONE AND VERIFIED 2026-08-15.
+      Stage 1 REBUILT AND RE-TESTED
       2026-08-12 (the earlier one referenced here was gone by this point -
       reverted along with an unrelated crash weeks prior, confirmed via
       grep before rebuilding). Two WebContentsView instances (isolated
@@ -166,6 +167,41 @@ status-bar room name, and plausibly #3.
       Minor cosmetic note: brief corner shimmer under very fast simultaneous
       width+height dragging (native compositing lag, not a functional bug).
       Make dashboard + room a persistent layer, kill the full page reload.
+      STAGE 2-4 VERIFICATION (2026-08-15), both gates passed on a clean
+      slate (all rooms deleted, fresh dashboard, zero rooms):
+      GATE 1 - full navigation cycle: sign in -> Room 1 (folder+file open,
+      confirmed) -> leave -> Room 2 (confirmed clean, zero leakage) ->
+      leave -> Room 1 again (folder AND file both correctly restored,
+      confirmed directly) -> leave. No crashes, no blank screens, no
+      state leaking between rooms.
+      GATE 2 - Door #2 metadata test (the design doc's own built-in
+      verification target): created a fresh room+file, typed "hello
+      world", saved, left and re-entered the SAME room 3+ times. File
+      still contains exactly "hello world" - no metadata stacking, no
+      corruption. The reload-triggered file corruption bug from earlier
+      sessions is confirmed genuinely gone, not just theorized to be
+      fixed - real, repeated, direct evidence.
+      Real gaps found and fixed DURING this verification work (not
+      hidden, logged honestly as found): (1) leaveCurrentRoom's onRoomLeft
+      listener saved editor state and removed the real folder but never
+      actually CLOSED the open real file tabs - fixed by keeping full
+      IEditorIdentifier[] (with groupId) for closeEditors(), not just
+      URIs; (2) openEditor() call for restore used the wrong argument
+      shape (options as a 2nd param instead of nested inside the 1st) -
+      real compile error caught (38 vs baseline 37), traced to the real
+      interface, fixed; (3) initial design conflated room ISOLATION
+      (clear on leave, correct) with room PERSISTENCE (restore on
+      re-entry, was missing entirely) - caught by real user testing
+      before more code was built on the wrong model, design doc updated
+      (section 6) with an explicit Scenario 1/2/3 split before the fix
+      was implemented.
+      KNOWN, NON-BLOCKING items logged for later (not gating this done):
+      save-timing UX (unsaved-file prompt appears on ENTERING the next
+      room rather than on leaving - manual save before leaving avoids it
+      entirely, standard protection behaving correctly just with
+      suboptimal timing); landing-page flash on cold boot even when
+      already signed in; extension host crash/restart loop (user reports
+      predates Stage 2 work, likely pre-existing to this fork setup).
 - [ ] Re-test the interim #4 routing patch's necessity once the overlay lands
       — it may become dead code if the reload it was mitigating no longer
       happens.
