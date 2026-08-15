@@ -105,6 +105,80 @@ disproved before the actual fix was found). Where something is fixed but
 not independently re-verified, it's marked as such below rather than
 checked off.
 
+## DONE — at prelaunch alpha level (revisit and harden post-launch)
+
+Everything below is real, tested, and working — solid enough for a
+prelaunch alpha with real users. "Prelaunch level" means: functionally
+correct and verified, NOT yet hardened for scale, edge cases beyond
+what's been directly tested, or production traffic. Each one is a real
+candidate to revisit and tighten once there's runway to do so, not a
+weak point to worry about right now.
+
+1. **Database persistence** — real, durable fix (Railway volume +
+   correct path + migration-ordering fix), proven with a direct create-
+   delete-redeploy-verify test. PRELAUNCH-LEVEL NOTE: this is SQLite on
+   a single persistent volume, which only works correctly for ONE
+   service replica. Revisit before ever scaling to multiple replicas -
+   the roadmap's own Postgres migration (Phase 4) is the real long-term
+   answer, not urgent today but not to be forgotten either.
+
+2. **#7 phantom rooms** — real root cause (a SQL filter bug), fixed,
+   re-verified after the persistence fix landed. Solid.
+
+3. **Sign-in + the 9-window startup bug** — root cause fully traced
+   (stale window closure caused by accumulated local state), fixed
+   STRUCTURALLY (window.restoreWindows default changed, not just today's
+   cleanup), proven under deliberately hostile repeated force-quit
+   conditions. Solid, durable fix.
+
+4. **#22 display name bug** — three competing code paths, only one
+   correctly read the real stored value. Fixed and independently
+   verified (confirmed not hardcoded, confirmed against the server
+   directly). Solid.
+
+5. **Phase 2 Stage 2-4 — the overlay's core architecture** — the single
+   largest item on the roadmap. Persistent dashboard/workbench views,
+   real show/hide navigation, room-join IPC, leaveCurrentRoom cleanup,
+   room isolation, and Scenario 1 save/restore (same-session room
+   switching) - all verified together under a real, repeated navigation
+   cycle AND the Door #2 corruption test, both passing cleanly.
+   PRELAUNCH-LEVEL NOTES, real things to revisit:
+   - Scenario 2 (cross-session persistence - quit the app, reopen the
+     same room later, expect it restored) is EXPLICITLY OUT OF SCOPE,
+     deferred to its own future phase, not silently dropped. Real
+     product questions attached (multi-machine access, stale files,
+     etc.) that deserve real design time, not a rushed answer.
+   - Save-timing UX: an unsaved-file prompt currently appears on
+     ENTERING the next room instead of on LEAVING the room with unsaved
+     changes. Not a data-loss bug (the system correctly asks before
+     losing anything), just non-ideal timing. Worth tightening later.
+   - Cursor/scroll position are not restored (deliberately deferred,
+     only folder + open files + active file are restored right now).
+   - Landing-page flash on cold boot even when already signed in - a
+     brief visual flash before settling on the dashboard. Cosmetic,
+     not investigated yet.
+   - Extension host crash/restart loop (GitHub/Copilot auth timeout) -
+     user reports this predates Stage 2 work, likely pre-existing to
+     this fork's setup rather than a regression. Not yet root-caused.
+
+## OPEN, NOT YET STARTED (per the roadmap's own phase order)
+
+- Phase 3: Yjs/CRDT for concurrent edits — the roadmap's own words:
+  "the biggest unknown on the whole roadmap." Currently last-write-wins.
+- Phase 3: #3 file corruption Door #1 already fixed; Door #2 confirmed
+  resolved by the overlay (see Stage 2-4 above) - Phase 3's real
+  remaining item is Yjs/CRDT itself.
+- Phase 4: SQLite → Postgres migration (see prelaunch note #1 above),
+  #9 (remove committed sqlite file from git), rate limiting, deletion
+  system (soft-delete + grace period, with real edge cases to design
+  for: concurrent deletion, owner-account-deleted state).
+- Phase 5: in-room text chat, AI review box (with its own real
+  concurrency/pricing design work needed before building).
+- Phase 6: remaining cleanup items (#6 wrong menu bar, #16 cursor
+  flicker, #13/#18 member count divergence, #17 untested freeze bug,
+  #21 file-provider error, account panel settings being UI-only with
+  no backend wiring).
+
 ## PHASE 0 — Instrumentation (do first, unblocks everything after)
 
 Nothing else is safe to test at real-user scale without this. Every bug found
