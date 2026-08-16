@@ -6,6 +6,19 @@ import { Emitter, Event } from '../../../../base/common/event.js';
 import { Disposable } from '../../../../base/common/lifecycle.js';
 import { IRequestService } from '../../../../platform/request/common/request.js';
 import { URI } from '../../../../base/common/uri.js';
+import { importAMDNodeModule } from '../../../../amdX.js';
+// Phase 3 (PHASE3_YJS_DESIGN.md): 'yjs' is a real third-party npm package,
+// not part of VS Code's own internal module graph. This codebase's lint
+// rules require third-party npm modules to be loaded via
+// importAMDNodeModule (real, actively-used pattern elsewhere in this
+// fork - see markedKatexSupport.ts's use for 'katex') rather than a
+// plain top-level `import`, which would type-check but fail to actually
+// resolve at runtime. Real compile-vs-runtime distinction caught before
+// testing, not after - a plain `import` passed TypeScript's type-checker
+// completely, but would NOT have worked when the app actually ran.
+// Type-only reference below (does not trigger runtime loading);
+// YDoc is the actual runtime module, loaded lazily via getYjsModule().
+type YDoc = InstanceType<typeof import('yjs').Doc>;
 
 
 const SERVER_URL = 'https://live-collab-production.up.railway.app';
@@ -102,6 +115,17 @@ export class LiveCollabService extends Disposable {
 	// lost on app quit, which is correct, documented behavior (Scenario 2,
 	// cross-session persistence, is explicitly out of scope for Stage 2).
 	private readonly _roomStates = new Map<string, RoomState>();
+	// Phase 3 (PHASE3_YJS_DESIGN.md): one Y.Doc per file, matching the
+	// existing per-file pattern already used by _fileCache. Created lazily,
+	// the update->emit listener is registered ONCE here at creation time
+	// (not per editor-contribution-instance) so multiple editors/panes on
+	// the same file never cause duplicate emits.
+	private readonly _yjsDocs = new Map<string, YDoc>();
+	// Fires when a REMOTE Yjs update arrives over the socket, carrying
+	// which file it's for. The editor contribution applies it and guards
+	// against re-emitting it as a local change (see PHASE3_YJS_DESIGN.md).
+	private readonly _onYjsUpdate = this._register(new Emitter<{ fileId: string; update: Uint8Array }>());
+	readonly onYjsUpdate: Event<{ fileId: string; update: Uint8Array }> = this._onYjsUpdate.event;
 	readonly onMemberJoined: Event<void> = this._onMemberJoined.event;
 
 	private readonly _onFileTree = this._register(new Emitter<{ tree: any[], roomName: string }>());
@@ -204,6 +228,12 @@ export class LiveCollabService extends Disposable {
 			if (payload.nonce && this._recentlySentNonces.has(payload.nonce)) { return; }
 			this._fileCache.set(payload.fileId, payload.code);
 			this._onCodeChange.fire(payload);
+		});
+		// Phase 3 (PHASE3_YJS_DESIGN.md): parallel Yjs update channel, running
+		// ALONGSIDE code:change above, not replacing it. Minimal first
+		// integration - if Yjs causes a problem, code:change still works.
+		this.socket.on('yjs:update', (payload: { fileId: string; update: number[] }) => {
+			this._onYjsUpdate.fire({ fileId: payload.fileId, update: new Uint8Array(payload.update) });
 		});
 		this.socket.on('cursor:update', (payload: any) => { this._onCursorUpdate.fire(payload); });
 		this.socket.on('cursor:leave', (payload: any) => { this._onCursorLeave.fire(payload); });
@@ -319,7 +349,39 @@ export class LiveCollabService extends Disposable {
 		}
 		this.socket.emit('code:change', { roomId, fileId, code, nonce });
 	}
-
+	// Phase 3 (PHASE3_YJS_DESIGN.md): one Y.Doc per file, created lazily.
+	// Registers the outgoing-update listener ONCE here (not in the editor
+	// contribution), so multiple editors/panes on the same file never
+	// double-emit. origin !== 'remote' means "this change happened locally
+	// (either real typing, captured automatically by y-monaco's own
+	// MonacoBinding, or another local mechanism) - broadcast it." origin
+	// === 'remote' means "this is an update WE just applied from another
+	// user - do not re-broadcast it back."
+	private _yjsModule: typeof import('yjs') | undefined;
+	// Loads the real yjs module at runtime via importAMDNodeModule (see the
+	// top-of-file comment for why a plain `import` doesn't work here).
+	// Cached after first load. PUBLIC so livecollabEditorContribution.ts can
+	// reuse the SAME loaded module (Y.applyUpdate) rather than loading its
+	// own separate copy.
+	async getYjsModule(): Promise<typeof import('yjs')> {
+		if (!this._yjsModule) {
+			this._yjsModule = await importAMDNodeModule<typeof import('yjs')>('yjs', 'dist/yjs.cjs');
+		}
+		return this._yjsModule;
+	}
+	async getOrCreateYjsDoc(fileId: string): Promise<YDoc> {
+		const existing = this._yjsDocs.get(fileId);
+		if (existing) { return existing; }
+		const Y = await this.getYjsModule();
+		const doc = new Y.Doc();
+		doc.on('update', (update: Uint8Array, origin: unknown) => {
+			if (origin === 'remote') { return; }
+			if (!this.socket?.connected) { return; }
+			this.socket.emit('yjs:update', { fileId, update: Array.from(update) });
+		});
+		this._yjsDocs.set(fileId, doc);
+		return doc;
+	}
 	emitCursorUpdate(roomId: string, fileId: string, position: { lineNumber: number; column: number }): void {
 		if (!this.socket?.connected) { return; }
 		this.socket.emit('cursor:update', { roomId, fileId, position, name: this._displayName });
