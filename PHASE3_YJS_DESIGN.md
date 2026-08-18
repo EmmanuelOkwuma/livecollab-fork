@@ -133,6 +133,68 @@ before the full implementation:
   torn down in sync with a room being joined/left, similar to how
   `leaveCurrentRoom()`/`_joinRoom()` already manage other state).
 
+## 5. Real integration attempt (2026-08-15/16): the loading mechanism, resolved
+
+Wired the minimal viable integration into the real editor (getOrCreateYjsDoc,
+MonacoBinding, the _isApplyingYjsChange guard - all as planned above).
+First attempt used a plain `import * as Y from 'yjs'`, which compiled
+clean but was WRONG - this codebase requires third-party npm packages to
+load via `importAMDNodeModule` (confirmed by comparing to real, working
+code: markedKatexSupport.ts's use of this exact pattern for 'katex').
+Rewrote both files to use it correctly (type-only references for
+compile-time types, real async-loaded+cached module access for
+runtime), compiled clean at baseline (37).
+
+**Live two-machine test with a real second user (2026-08-16) failed**:
+`Uncaught ReferenceError: require is not defined`, then `Cannot read
+properties of undefined (reading 'Doc')` at getOrCreateYjsDoc. Root
+cause fully traced with real evidence, not guessed at a second time:
+
+- `importAMDNodeModule` calls `AMDModuleImporter.INSTANCE.load(...)` -
+  confirmed by reading its actual implementation in `src/vs/amdX.ts`.
+  This is a genuine AMD script loader; the target file MUST use AMD's
+  `define()` semantics (or a UMD wrapper that detects and uses AMD).
+- Checked EVERY real, non-test file in this codebase that successfully
+  calls `importAMDNodeModule` (16 total, `grep -rln` confirmed). Spot-
+  checked three independently: katex, and an @xterm addon
+  (`addon-search`). Both start with the EXACT SAME UMD wrapper pattern:
+  `!function(e,t){"object"==typeof exports...`. This is universal, not
+  situational - every successful use in this codebase loads a file the
+  UPSTREAM PACKAGE MAINTAINERS shipped as UMD.
+- Checked yjs's actual shipped files directly: `dist/yjs.cjs` is pure
+  CommonJS (`require('lib0/observable')` on line 1, no wrapper -
+  exactly matching the crash). `dist/yjs.mjs` is pure native ESM
+  (`import { ObservableV2 } from 'lib0/observable'`, also no wrapper).
+  Searched the ENTIRE yjs package for the UMD-detection string
+  (`define.amd`) - zero matches anywhere in the package.
+
+**Conclusion, confirmed not assumed: yjs, y-monaco, and yjs's own
+`lib0` dependency do not ship a UMD build. This codebase has no
+existing pattern for loading a package in this situation, because
+every other third-party dependency it currently loads this way happens
+to already ship one.** This is a real, structural gap, not a wrong file
+path - trying a different path inside node_modules/yjs will not fix
+this; no such file exists there.
+
+**The real fix, scoped and ready to build next session:** bundle yjs +
+lib0 + y-monaco into our own UMD-wrapped output file(s) using esbuild,
+the same way this project already vendors other third-party code (see
+`socket.io.esm.min.js` and the Sentry renderer bundle, both already
+committed under `src/vs/workbench/contrib/livecollab/browser/vendor/`
+- this is an established, already-proven pattern in this exact
+project, not a new one). Commit the bundled output(s) to that same
+vendor directory, then update the `importAMDNodeModule` calls in
+`livecollabService.ts` and `livecollabEditorContribution.ts` to point
+at the new vendored files instead of raw `node_modules` paths.
+
+**Discipline note for next session:** the first live test failed with
+a real user waiting. The correct response, per this project's own
+standing practice all session, is not a second rushed guess under the
+same pressure - it's understanding the failure completely (done above,
+with real evidence at every step) and building the actual fix
+carefully, separately from live-test conditions. That is what happens
+next session, not this one.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
