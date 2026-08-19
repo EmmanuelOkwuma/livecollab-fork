@@ -6,7 +6,6 @@ import { Emitter, Event } from '../../../../base/common/event.js';
 import { Disposable } from '../../../../base/common/lifecycle.js';
 import { IRequestService } from '../../../../platform/request/common/request.js';
 import { URI } from '../../../../base/common/uri.js';
-import { importAMDNodeModule } from '../../../../amdX.js';
 // Phase 3 (PHASE3_YJS_DESIGN.md): 'yjs' is a real third-party npm package,
 // not part of VS Code's own internal module graph. This codebase's lint
 // rules require third-party npm modules to be loaded via
@@ -357,17 +356,32 @@ export class LiveCollabService extends Disposable {
 	// MonacoBinding, or another local mechanism) - broadcast it." origin
 	// === 'remote' means "this is an update WE just applied from another
 	// user - do not re-broadcast it back."
-	private _yjsModule: typeof import('yjs') | undefined;
-	// Loads the real yjs module at runtime via importAMDNodeModule (see the
-	// top-of-file comment for why a plain `import` doesn't work here).
-	// Cached after first load. PUBLIC so livecollabEditorContribution.ts can
-	// reuse the SAME loaded module (Y.applyUpdate) rather than loading its
-	// own separate copy.
-	async getYjsModule(): Promise<typeof import('yjs')> {
-		if (!this._yjsModule) {
-			this._yjsModule = await importAMDNodeModule<typeof import('yjs')>('yjs', 'dist/yjs.cjs');
+	// Loads yjs+y-monaco from our own vendored bundle (real
+	// yjs/y-monaco don't ship UMD - importAMDNodeModule can't load them,
+	// confirmed via a live two-machine test failure and full root-cause
+	// trace, see PHASE3_YJS_DESIGN.md sections 5-6). Combined into ONE
+	// bundle deliberately - two separate bundles would each carry their
+	// own independent copy of yjs, a real dual-package-hazard risk.
+	// Loaded via plain dynamic import(), matching this project's own
+	// already-proven pattern for socket.io.esm.min.js (see connect()
+	// below - same directory, same technique). Cached after first load.
+	private _yjsBundle: { Y: typeof import('yjs'); MonacoBinding: typeof import('y-monaco').MonacoBinding } | undefined;
+	private async _loadYjsBundle(): Promise<{ Y: typeof import('yjs'); MonacoBinding: typeof import('y-monaco').MonacoBinding }> {
+		if (!this._yjsBundle) {
+			// @ts-ignore
+			const loaded = await import('./vendor/livecollab-yjs.esm.min.js') as unknown as { Y: typeof import('yjs'); MonacoBinding: typeof import('y-monaco').MonacoBinding };
+			this._yjsBundle = loaded;
+			return loaded;
 		}
-		return this._yjsModule;
+		return this._yjsBundle;
+	}
+	// PUBLIC so livecollabEditorContribution.ts can reuse the SAME loaded
+	// bundle rather than loading its own separate copy.
+	async getYjsModule(): Promise<typeof import('yjs')> {
+		return (await this._loadYjsBundle()).Y;
+	}
+	async getMonacoBindingClass(): Promise<typeof import('y-monaco').MonacoBinding> {
+		return (await this._loadYjsBundle()).MonacoBinding;
 	}
 	async getOrCreateYjsDoc(fileId: string): Promise<YDoc> {
 		const existing = this._yjsDocs.get(fileId);

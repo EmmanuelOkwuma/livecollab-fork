@@ -8,21 +8,28 @@ import { ICodeEditor } from '../../../../editor/browser/editorBrowser.js';
 import { EditorContributionInstantiation, registerEditorContribution } from '../../../../editor/browser/editorExtensions.js';
 import { IEditorContribution } from '../../../../editor/common/editorCommon.js';
 import { livecollabService } from './livecollabService.js';
-import { importAMDNodeModule } from '../../../../amdX.js';
-// Phase 3 (PHASE3_YJS_DESIGN.md): both are real third-party npm packages,
-// loaded via importAMDNodeModule (see livecollabService.ts's top-of-file
-// comment for the full reasoning - a plain `import` type-checks but does
-// not correctly resolve at runtime in this codebase). Type-only
-// references below (no runtime loading triggered); the actual runtime
-// modules are loaded lazily via _loadYMonaco().
+import { createMonacoBaseAPI } from '../../../../editor/common/services/editorBaseApi.js';
+// Type-only reference (no runtime import triggered) - the actual
+// runtime class is loaded via livecollabService.getMonacoBindingClass(),
+// see that file's own comments for the full reasoning (yjs/y-monaco
+// don't ship UMD, importAMDNodeModule can't load them - real root cause
+// traced via a live two-machine test failure, see PHASE3_YJS_DESIGN.md
+// sections 5-6). This file's own real, NEW responsibility: y-monaco's
+// bundled code expects to import the standalone 'monaco-editor' npm
+// package (which this fork doesn't use - it IS Monaco internally,
+// structured differently). Our vendor bundle's build step redirects
+// that unresolvable import to a small shim
+// (vendor/_livecollab-monaco-shim.mjs) that reads real values from
+// globalThis.__livecollabMonacoAPI - set here, once, at module load,
+// using this codebase's OWN createMonacoBaseAPI(), which builds an
+// object with the exact shape needed using this codebase's own real,
+// live Range/Selection/SelectionDirection classes (confirmed via
+// source inspection before writing this - not a guess). MUST run here,
+// synchronously, at module top-level - before ANY code path in this
+// file could trigger the vendor bundle's dynamic import, since the
+// shim reads this global at module-evaluation time, not lazily.
 type YMonacoBinding = InstanceType<typeof import('y-monaco').MonacoBinding>;
-let _yMonacoModule: typeof import('y-monaco') | undefined;
-async function _loadYMonaco(): Promise<typeof import('y-monaco')> {
-	if (!_yMonacoModule) {
-		_yMonacoModule = await importAMDNodeModule<typeof import('y-monaco')>('y-monaco', 'dist/y-monaco.cjs');
-	}
-	return _yMonacoModule;
-}
+(globalThis as any).__livecollabMonacoAPI = createMonacoBaseAPI();
 
 export class LiveCollabEditorContribution extends Disposable implements IEditorContribution {
 
@@ -153,14 +160,14 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 		const fileId = modelAtStart.uri.path.split('/').pop() || modelAtStart.uri.path;
 
 		const doc = await livecollabService.getOrCreateYjsDoc(fileId);
-		const YMonaco = await _loadYMonaco();
+		const MonacoBindingClass = await livecollabService.getMonacoBindingClass();
 
 		const modelNow = this.editor.getModel();
 		if (!modelNow || modelNow !== modelAtStart) { return; } // stale - user switched files again while we were loading
 
 		this._yjsBinding?.destroy();
 		const ytext = doc.getText('content');
-		this._yjsBinding = new YMonaco.MonacoBinding(ytext, modelNow, new Set([this.editor]));
+		this._yjsBinding = new MonacoBindingClass(ytext, modelNow, new Set([this.editor]));
 	}
 }
 
