@@ -195,6 +195,87 @@ with real evidence at every step) and building the actual fix
 carefully, separately from live-test conditions. That is what happens
 next session, not this one.
 
+## 6. Bundling attempt (2026-08-16): a second, deeper real blocker found
+
+Corrected course from section 5's plan mid-session: discovered this
+project ALREADY has a simpler, proven pattern than UMD/AMD for vendoring
+third-party code - `socket.io.esm.min.js` (already in the same vendor
+directory) is genuine native ESM (real `export{}` statement, confirmed
+by reading its actual last bytes), loaded via a PLAIN dynamic
+`import()` in livecollabService.ts's own existing code - no
+importAMDNodeModule involved. This is simpler and already proven
+working in this exact file. Switched the plan to bundle yjs+y-monaco
+as native ESM instead of UMD.
+
+Real dual-package-hazard risk identified and designed around BEFORE
+bundling: bundling yjs and y-monaco as two SEPARATE files would give
+each its own independent copy of yjs's code, which could break
+instanceof-style identity checks between a Y.Doc created by one copy
+and consumed by the other. Fix: single combined entry point
+(`vendor/_livecollab-yjs-entry.mjs`, committed) re-exporting both under
+one shared module, ensuring only one copy of yjs exists in the final
+bundle.
+
+**Running the actual esbuild bundle surfaced a real, second, deeper
+blocker**: `y-monaco/src/y-monaco.js` imports
+`monaco-editor/esm/vs/editor/editor.api.js` and `y-protocols/awareness`,
+neither of which exist as real, resolvable packages in this project
+(we don't depend on the standalone `monaco-editor` npm package at all -
+this VS Code fork IS Monaco, structured completely differently, as its
+own internal `vs/editor/*` module tree, not a separate npm package).
+
+Checked whether the `monaco` import is safely markable as a compile-
+time-only type reference (which would make this a non-issue) or a
+genuine runtime dependency: CONFIRMED GENUINE RUNTIME USAGE via direct
+grep of y-monaco's source - real calls like
+`monaco.Selection.createWithDirection(...)`, `new monaco.Range(...)`,
+`monaco.SelectionDirection.RTL`. Not just JSDoc types; this needs a
+real, working object at runtime.
+
+Checked whether this codebase already exposes a global `monaco` object
+matching what y-monaco expects (which would let us mark the import
+external and point it at that global): found exactly ONE such
+exposure, `globalThis.monaco = createMonacoBaseAPI()` in
+`editorWebWorker.ts` - but this is INSIDE A WEB WORKER context, a
+separate thread from where our actual editor code
+(livecollabEditorContribution.ts) runs. No equivalent exists in the
+main renderer/workbench thread. Ruled out as a ready-made fix, not
+abandoned as a direction - see below.
+
+**Real, promising lead for next session, found via evidence not
+guessed**: checked `createMonacoBaseAPI()`'s actual implementation in
+`src/vs/editor/common/services/editorBaseApi.ts`. It builds an object
+with EXACTLY the shape y-monaco needs - real `Range`, `Selection`, and
+`SelectionDirection` properties, using this codebase's own actual,
+real editor classes (the SAME ones our real editor instances already
+use, confirmed: `Range: Range` and `Selection: Selection` directly
+reference the imports at the top of that same file, not a separate,
+incompatible copy). This function is exported and callable from our
+own code - it is simply not currently invoked anywhere in the main
+thread, only inside the worker file.
+
+**The real, concrete plan for next session**: call
+`createMonacoBaseAPI()` from our own code in the main thread (likely
+from `livecollabEditorContribution.ts`, before the bundle's code
+executes), and make its result available to the bundled y-monaco code
+in place of the unresolvable `monaco-editor` npm import - either via a
+small shim module that esbuild's `--external` + `--alias` resolves the
+import path to, or by setting `globalThis.monaco` in the main thread
+before the bundle loads (matching the SAME pattern the web worker file
+already uses, just in a different thread). `y-protocols/awareness`
+needs a similar check - either install it as a real, small dependency
+(it is a real, separate npm package, not something requiring VS Code's
+internal APIs) and bundle it in normally, or confirm it can be safely
+stubbed since this minimal first integration doesn't use awareness/
+cursor features yet.
+
+**Discipline held again**: stopped here rather than guessing through
+an increasingly long, unverified chain (bundle → mark external → shim
+a global → hope the shape matches → hope awareness stubs safely) after
+already having one live-test failure this session. Real evidence
+gathered at each step; the actual fix is deferred to a session with a
+clear head, not attempted under continued pressure.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
