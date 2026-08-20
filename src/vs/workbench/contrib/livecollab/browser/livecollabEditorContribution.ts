@@ -158,8 +158,17 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 		const modelAtStart = this.editor.getModel();
 		if (!modelAtStart) { return; }
 		const fileId = modelAtStart.uri.path.split('/').pop() || modelAtStart.uri.path;
+		// Captured synchronously, before any await, so this reflects whatever
+		// real content is ALREADY in the model right now (see
+		// PHASE3_YJS_DESIGN.md section 7 - a brand-new Y.Doc must be seeded
+		// with this, or y-monaco's own initial sync will overwrite real
+		// content with an empty document). Only takes effect if a NEW doc is
+		// actually being created - getOrCreateYjsDoc ignores this entirely
+		// when reusing an existing doc, so real collaborative history is
+		// never at risk of being re-seeded.
+		const currentContent = modelAtStart.getValue();
 
-		const doc = await livecollabService.getOrCreateYjsDoc(fileId);
+		const doc = await livecollabService.getOrCreateYjsDoc(fileId, currentContent);
 		const MonacoBindingClass = await livecollabService.getMonacoBindingClass();
 
 		const modelNow = this.editor.getModel();

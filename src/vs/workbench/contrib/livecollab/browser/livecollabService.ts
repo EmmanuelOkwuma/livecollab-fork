@@ -383,11 +383,24 @@ export class LiveCollabService extends Disposable {
 	async getMonacoBindingClass(): Promise<typeof import('y-monaco').MonacoBinding> {
 		return (await this._loadYjsBundle()).MonacoBinding;
 	}
-	async getOrCreateYjsDoc(fileId: string): Promise<YDoc> {
+	// seedContent: PHASE3_YJS_DESIGN.md section 7 - real bug found via a
+	// live two-machine test, root-caused to the exact line in y-monaco's
+	// source. A brand-new, empty Y.Doc's initial sync unconditionally
+	// overwrites real editor content that was already loaded by the
+	// separate, older virtual-filesystem mechanism (onFileContent, which
+	// does NOT populate _fileCache - confirmed by grep before relying on
+	// it). Only used when ACTUALLY creating a new doc (never touches an
+	// existing one, so real collaborative history is never at risk).
+	// Inserted BEFORE the update listener is registered, so the seed
+	// itself is local bootstrapping, never broadcast as a fake edit.
+	async getOrCreateYjsDoc(fileId: string, seedContent?: string): Promise<YDoc> {
 		const existing = this._yjsDocs.get(fileId);
 		if (existing) { return existing; }
 		const Y = await this.getYjsModule();
 		const doc = new Y.Doc();
+		if (seedContent) {
+			doc.getText('content').insert(0, seedContent);
+		}
 		doc.on('update', (update: Uint8Array, origin: unknown) => {
 			if (origin === 'remote') { return; }
 			if (!this.socket?.connected) { return; }
