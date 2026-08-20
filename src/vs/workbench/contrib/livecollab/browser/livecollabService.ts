@@ -473,6 +473,21 @@ export class LiveCollabService extends Disposable {
 		this._roomId = undefined;
 		this._roomName = undefined;
 		this._lastMembers = [];
+		// Real, serious bug found via live testing (2026-08-20): Yjs docs
+		// were keyed ONLY by bare filename, never room-scoped, and never
+		// cleared here - meaning a file reused across a DIFFERENT room
+		// later in the same running session (e.g. delete a room, create a
+		// new one with a same-named file) would silently reuse the OLD
+		// doc's stale content. Confirmed: a second live test showed
+		// leftover characters from an unrelated earlier test appearing in
+		// a brand-new room's file. Real fix: clear both Yjs maps on every
+		// room leave, same as the existing room-isolation pattern already
+		// used for the folder/file system state below this method's
+		// callers. destroy() is Yjs's own real cleanup method, confirmed
+		// via source inspection earlier this session.
+		for (const doc of this._yjsDocs.values()) { doc.destroy(); }
+		this._yjsDocs.clear();
+		this._yjsDocsSeeded.clear();
 		this._onMembersChanged.fire([]);
 		// Fire onRoomLeft - livecollab.contribution.ts and
 		// livecollabFolderContribution.ts listen and handle all teardown
