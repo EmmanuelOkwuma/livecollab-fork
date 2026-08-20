@@ -126,9 +126,23 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 			// Open the virtual folder in the explorer
 			const uri = URI.file('/').with({ scheme: LIVECOLLAB_SCHEME, authority: roomId, path: '/' });
 			// Open virtual folder for this room (reset flag ensures correct room each time)
+			// TEMPORARY DIAGNOSTIC 2026-08-20: real, confirmed evidence rules
+			// out both the obvious theories (this contribution is registered
+			// exactly once - confirmed via grep - and this flag never resets -
+			// also confirmed via grep), so this code path should only ever add
+			// ONE virtual folder per app session. The observed bug (multiple
+			// stacked 'Shared Room' entries in a live two-machine test) directly
+			// contradicts that. This log tells us, from real runtime behavior,
+			// whether this exact path is somehow running more than once
+			// (meaning the static analysis above is wrong somewhere) or whether
+			// the duplicates come from a different, not-yet-found code path.
+			console.log('[FOLDER-DUP-DIAG] onFileTree folder-add check, uri:', uri.toString(), 'roomName:', roomName, '_virtualFolderAdded was:', _virtualFolderAdded, 'at', Date.now());
 			if (!_virtualFolderAdded) {
 				_virtualFolderAdded = true;
+				console.log('[FOLDER-DUP-DIAG] ADDING folder now, uri:', uri.toString());
 				await this.workspaceEditingService.updateFolders(0, 0, [{ uri, name: roomName }]);
+			} else {
+				console.log('[FOLDER-DUP-DIAG] SKIPPED - flag already true');
 			}
 		}));
 

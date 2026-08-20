@@ -405,6 +405,56 @@ every real call site of `updateFolders` and `populateFromTree`
 across a full multi-room-join sequence), fix it, THEN re-attempt the
 Yjs live verification that this session's fixes still need.
 
+## 9. Folder-duplication bug: two plausible theories ruled out with real evidence, diagnostic added for next session
+
+Traced the two most likely explanations for the multiple stacked
+"Shared Room" folder entries with real evidence, not assumption:
+
+**Theory 1 - the room-leave folder removal only cleans up the REAL
+folder, not the virtual one.** Confirmed real: `onRoomLeft`'s cleanup
+(`updateFolders(realFolderIndex, 1)`) explicitly filters for
+`f.uri.scheme !== LIVECOLLAB_SCHEME` - it only ever removes the real
+(file://) folder, never the virtual (livecollab://) one added by the
+`onFileTree` handler. This asymmetry is real and worth fixing
+regardless, but does NOT by itself explain repeated duplication - see
+Theory 2.
+
+**Theory 2 - multiple live instances of LiveCollabFolderContribution,
+each with independent state.** Checked and RULED OUT with real
+evidence: `grep` confirms this contribution is registered exactly
+once (`registerWorkbenchContribution(..., LiveCollabFolderContribution, ...)`,
+a single call), consistent with this project's own persistent-workbench
+architecture (the whole point of Phase 2 was to never reload/recreate
+the workbench across room switches). Also confirmed the
+`_virtualFolderAdded` flag itself never resets anywhere (`grep`: set
+in exactly two places, both inside the same block, no reset). Given
+both of these, straightforward static reading says this exact code
+path should only ever add ONE virtual folder for the entire app
+session - directly contradicting the observed multiple-entries bug.
+
+**Conclusion: the real cause is not yet confirmed.** Static code
+reading has reached its useful limit here - the evidence available
+this way actively contradicts what's being observed, meaning either
+the analysis above is wrong in a way not yet found, or the duplicates
+come from an entirely different, not-yet-located code path. Rather
+than keep guessing without new information, added temporary,
+targeted diagnostic logging (`[FOLDER-DUP-DIAG]`) directly at this
+exact check - logs the flag's state and whether the add actually runs,
+every time `onFileTree` fires. Not yet run - needs a real live
+multi-room test (join, leave, join a different room) with this log
+active to see the ACTUAL runtime behavior, which will show directly
+whether this specific code path really does run more than once
+(meaning the static analysis missed something) or whether the true
+cause lies elsewhere entirely.
+
+**Real next session task, precisely**: run a live test with this
+diagnostic active, read the actual log output, and let real behavior
+- not more theorizing - determine where to look next. Once the true
+mechanism is found and fixed, also fix Theory 1's real, confirmed
+asymmetry (virtual folder never removed on leave) regardless of
+whether it turns out to be the primary cause, since it's a genuine gap
+either way.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
