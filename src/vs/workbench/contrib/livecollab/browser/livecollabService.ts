@@ -120,6 +120,17 @@ export class LiveCollabService extends Disposable {
 	// (not per editor-contribution-instance) so multiple editors/panes on
 	// the same file never cause duplicate emits.
 	private readonly _yjsDocs = new Map<string, YDoc>();
+	// PHASE3_YJS_DESIGN.md section 7 follow-up: real race found via a
+	// second live test - the synchronous seed in getOrCreateYjsDoc only
+	// catches content that's ALREADY in the model at binding time. If real
+	// content arrives slightly AFTER binding (a genuine race, confirmed by
+	// the observed symptom: file empty until the NEXT edit, which matches
+	// content only ever arriving via code:change, not any working initial-
+	// load path), the doc stays empty until something re-seeds it. Tracks
+	// which fileIds have been seeded with real content, so trySeedYjsDoc
+	// below gets a second (and third) chance without ever re-seeding once
+	// real content has genuinely landed.
+	private readonly _yjsDocsSeeded = new Set<string>();
 	// Fires when a REMOTE Yjs update arrives over the socket, carrying
 	// which file it's for. The editor contribution applies it and guards
 	// against re-emitting it as a local change (see PHASE3_YJS_DESIGN.md).
@@ -400,6 +411,7 @@ export class LiveCollabService extends Disposable {
 		const doc = new Y.Doc();
 		if (seedContent) {
 			doc.getText('content').insert(0, seedContent);
+			this._yjsDocsSeeded.add(fileId);
 		}
 		doc.on('update', (update: Uint8Array, origin: unknown) => {
 			if (origin === 'remote') { return; }
@@ -408,6 +420,24 @@ export class LiveCollabService extends Disposable {
 		});
 		this._yjsDocs.set(fileId, doc);
 		return doc;
+	}
+	// Second (and third) chance to seed, called whenever real content
+	// might have just arrived (onCodeChange, onFileContent). Guarded
+	// twice: only if this fileId hasn't already been confirmed seeded,
+	// AND only if the doc's real, current text is still genuinely empty
+	// (never overwrites actual content, seeded or from real edits, even
+	// if the tracking flag somehow lagged). Does nothing if the doc
+	// doesn't exist yet - a file that hasn't been opened has no binding
+	// to correct, and will seed correctly via the normal path once it is.
+	trySeedYjsDoc(fileId: string, content: string): void {
+		if (!content) { return; }
+		if (this._yjsDocsSeeded.has(fileId)) { return; }
+		const doc = this._yjsDocs.get(fileId);
+		if (!doc) { return; }
+		const ytext = doc.getText('content');
+		if (ytext.length > 0) { this._yjsDocsSeeded.add(fileId); return; } // real content already landed some other way
+		ytext.insert(0, content);
+		this._yjsDocsSeeded.add(fileId);
 	}
 	emitCursorUpdate(roomId: string, fileId: string, position: { lineNumber: number; column: number }): void {
 		if (!this.socket?.connected) { return; }

@@ -90,6 +90,14 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 		// Apply remote code changes to this editor
 		this._register(livecollabService.onCodeChange(({ fileId, code }) => {
 			console.log('[LiveCollab] code change received, fileId:', fileId, 'model uri path:', editor.getModel()?.uri.path);
+			// PHASE3_YJS_DESIGN.md section 7 follow-up: real content may have
+			// arrived slightly after the Yjs binding was set up (a genuine
+			// race, confirmed by a live two-machine test - file stayed empty
+			// until the next edit). This is the SAME mechanism that made the
+			// file correct again in that test, now made deliberate rather
+			// than accidental. Safe to call unconditionally - no-ops if the
+			// doc doesn't exist yet or has already received real content.
+			livecollabService.trySeedYjsDoc(fileId, code);
 			// Always update cache regardless of which file is open
 			livecollabService.updateFileCache(fileId, code);
 			const model = this.editor.getModel();
