@@ -354,6 +354,57 @@ crashes found and fixed correctly earlier this session; this is a
 different class of problem (silent data-loss risk, not a crash) found
 by the same disciplined testing approach.
 
+## 8. Fourth blocker fixed, fifth (different, older-system) blocker found before it could be cleanly verified
+
+Section 7's seed-race gap: fixed with `trySeedYjsDoc`, wired into
+`onCodeChange`, matching the mechanism that empirically "fixed" it by
+accident in the prior test. A separate, more serious gap was ALSO found
+and fixed in the same session: Yjs docs were keyed ONLY by bare
+filename (confirmed: `model.uri.path.split('/').pop()`), never
+room-scoped, and NEVER cleared anywhere (confirmed: zero calls to
+`_yjsDocs.clear/delete` existed). A filename reused across a different
+room later in the same running session silently inherited the old
+room's stale content - confirmed by a live test where leftover
+characters from an unrelated earlier test appeared in a brand-new
+room's file sharing the same filename. Fixed: both `_yjsDocs` and
+`_yjsDocsSeeded` are now cleared in `leaveCurrentRoom()`, calling the
+real `Y.Doc.destroy()` method (confirmed via yjs's own source, not
+assumed by analogy).
+
+**Re-test with a fresh app restart on both machines (2026-08-20)
+surfaced a FIFTH, different, real bug - before the Yjs fix itself
+could be cleanly verified.** Maureen's Explorer showed MULTIPLE
+"Shared Room" folder entries stacked up simultaneously (confirmed via
+a real screenshot, not a guess), despite both her and Emmanuel
+confirming they were in the exact same room (matching Room ID,
+`room-e95...`, checked directly in the Members panel on both sides).
+No "Hello World" appeared in any visible `test.js`.
+
+**This is NOT a Yjs bug** - it lives in the older folder-attachment
+system (`livecollabFolderContribution.ts` / the real-folder
+`updateFolders` mechanism used throughout tonight's earlier Stage 2
+work), not anything touched in tonight's Yjs fixes. Real, working
+theory, NOT yet confirmed with code-level evidence: multiple room
+folders are accumulating in Maureen's workspace across the several
+room-join/leave cycles tonight's live testing required, rather than
+being cleanly replaced each time - likely a gap in the SAME
+folder-removal logic fixed earlier this project (see the Stage 2
+milestone commit `eba114ba262` for the original real-folder-removal
+fix) that either doesn't cover this specific sequence of events, or
+has a separate, new edge case.
+
+**Discipline held, deliberately, under real pressure**: stopped here
+rather than chasing a fifth, newly-discovered, different-system bug
+live, late, with two tired people. The Yjs seed/room-isolation fixes
+in this section are real, committed, and compile clean - they are
+simply NOT YET cleanly verified live, because THIS separate,
+pre-existing folder-duplication bug got in the way of a clean test
+before they could be. Next session's real first task: root-cause the
+folder-duplication bug with real evidence (likely starting by tracing
+every real call site of `updateFolders` and `populateFromTree`
+across a full multi-room-join sequence), fix it, THEN re-attempt the
+Yjs live verification that this session's fixes still need.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
