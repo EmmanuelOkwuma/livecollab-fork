@@ -276,6 +276,84 @@ already having one live-test failure this session. Real evidence
 gathered at each step; the actual fix is deferred to a session with a
 clear head, not attempted under continued pressure.
 
+## 7. Real bundle works, live test (2026-08-19) finds a third real blocker: no initial-state sync
+
+The compile-and-loading fix from section 6 genuinely worked - packaged
+and launched, the exact crash from the two-machine test (`require is
+not defined`, `Cannot read properties of undefined (reading 'Doc')`)
+is CONFIRMED GONE. Room join, folder attach, and file tree broadcast
+all worked normally in solo testing. Typing alone in a file also
+worked cleanly.
+
+**Real two-machine re-test (Emmanuel + Maureen, corrected build on
+both machines) surfaced a genuine, different, third blocker**, found
+before the actual concurrent-typing test could even begin: Emmanuel
+typed "Hello World" into a file BEFORE inviting Maureen. Maureen
+joined, her Explorer correctly showed the same folder/file (the
+existing, unrelated file-tree broadcast mechanism), but her EDITOR
+showed the file as EMPTY - the "Hello World" Emmanuel typed before she
+joined was not there.
+
+**Root cause confirmed with the exact line of code, not guessed**:
+checked `y-monaco`'s real source directly. Its `MonacoBinding`
+constructor's initial sync logic:
+
+```js
+const ytextValue = ytext.toString()
+if (monacoModel.getValue() !== ytextValue) {
+  monacoModel.setValue(ytextValue)
+}
+```
+
+Maureen's `getOrCreateYjsDoc(fileId)` call creates a BRAND NEW,
+EMPTY `Y.Doc` for this file (she has never received any `yjs:update`
+for it - Emmanuel's edit happened before she connected, so the
+`doc.on('update', ...)` broadcast in `livecollabService.ts` fired with
+nobody listening). Her editor's REAL content ("Hello World") was
+correctly loaded by the OLD, separate virtual-filesystem mechanism
+(`livecollabFileSystemProvider.ts`'s `onFileContent`/
+`requestFileContent`, unrelated to Yjs). But the moment `MonacoBinding`
+attaches, the code above runs: `ytext.toString()` is `""` (her empty
+doc), `monacoModel.getValue()` is `"Hello World"` (correctly loaded),
+they don't match, so `monacoModel.setValue("")` FORCES the editor back
+to empty - the empty Yjs doc overwrites the real content.
+
+**The real, structural gap this exposes**: the current implementation
+only relays LIVE, FUTURE Yjs updates (`doc.on('update', ...)` firing
+after a peer is connected and listening). There is no mechanism at all
+for a newly-created `Y.Doc` to learn about content that existed before
+it was created. This is a broader, more urgent version of the open
+item already flagged in section 4 ("what's authoritative if the server
+restarts") - the same underlying question (where does a Y.Doc's
+correct starting state come from?) applies just as much to a normal
+peer joining an active room as it does to a server restart.
+
+**Real options for next session, not yet decided or attempted**:
+- Seed a newly-created `Y.Doc` with the existing content (from the
+  SAME file-content source the old system already uses) via
+  `ytext.insert(0, existingContent)` BEFORE the `MonacoBinding` is
+  created, so the initial sync check above finds them already equal.
+  Real open question: what if two peers create the Y.Doc for the same
+  file at nearly the same time - which one's seed wins, and could this
+  race with a genuine concurrent edit?
+- Have the SERVER (not each client) own one authoritative Y.Doc per
+  file/room, sending its current full state (`Y.encodeStateAsUpdate`)
+  to any newly-joining client, rather than each client creating its
+  own independent `Y.Doc` locally. This is a more correct long-term
+  architecture but a bigger change than the minimal-first-integration
+  scope this session was working within.
+- Something narrower: only create/bind the `Y.Doc` AFTER the old
+  system's real content has loaded, and seed it from that real content
+  at creation time (a specific version of the first option).
+
+**Discipline held a third time this session**: found via a real live
+test with a real second person, root-caused with the exact offending
+line of code (not inferred or guessed), and the actual fix deferred to
+proper design work rather than patched live under pressure. Two
+crashes found and fixed correctly earlier this session; this is a
+different class of problem (silent data-loss risk, not a crash) found
+by the same disciplined testing approach.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
