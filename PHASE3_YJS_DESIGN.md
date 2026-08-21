@@ -455,6 +455,64 @@ asymmetry (virtual folder never removed on leave) regardless of
 whether it turns out to be the primary cause, since it's a genuine gap
 either way.
 
+## 10. Session close-out: real symptom confirmed visually, console log capture unreliable tonight
+
+Real, directly-observed symptom (no console needed - seen with the
+user's own eyes): entering Room B immediately showed Room A's real
+folder and file already present, with the Room ID and Members panel
+both empty. This is a genuinely serious, real bug - room state is not
+isolating correctly between rooms in at least this scenario. It has
+NOT yet been root-caused with code-level evidence.
+
+**Console log capture was unreliable this session and did not produce
+usable diagnostic data.** Two separate export attempts were made:
+
+- First export: zero matches for `FOLDER-CLEANUP-DIAG` (the new,
+  correctly-targeted diagnostic from section 9) despite the bug being
+  reproduced. Also zero matches for basic `[LiveCollab]` messages that
+  reliably appeared in every earlier session tonight - strongly
+  suggesting this export was missing real output entirely (a DevTools
+  console log-level filter is the likely cause, not that nothing
+  happened), rather than genuine absence of activity.
+- Second export: confirmed to be the DASHBOARD console (identifiable
+  via `[LC-MODULE]`/`dashRender` messages), not the workbench one
+  where the folder-cleanup diagnostic actually lives.
+
+**One real, separate, useful finding did come out of the dashboard
+export**: the dashboard's socket connection is repeatedly disconnecting
+and reconnecting - many cycles of `dashboard socket disconnected` /
+`dashboard socket connected` - while sitting idle on the dashboard
+screen, not during any room activity. This is a genuine, real
+instability worth investigating on its own, and plausibly related to
+tonight's confusing symptoms (a connection dropping and reconnecting
+at the wrong moment could easily produce stale or missing data - empty
+Room ID/Members panels are exactly the kind of symptom a connection
+gap would produce).
+
+**Discipline note**: rather than keep asking for more DevTools
+exports/settings adjustments with unreliable results this late in a
+long session, stopped here and recorded what's actually confirmed
+(the real, visually-observed bug; the connection-instability finding)
+rather than continue troubleshooting the LOGGING TOOLING itself
+indefinitely. The [FOLDER-CLEANUP-DIAG] diagnostic added in section 9
+is still real and still in place - it simply hasn't produced a clean,
+verified data capture yet.
+
+**Real next session tasks, in order**:
+1. Investigate the dashboard socket disconnect/reconnect loop first -
+   it's a real, confirmed instability that could be a root cause (or
+   contributing factor) for multiple symptoms seen tonight, not just
+   folder duplication/isolation.
+2. Before attempting another live test, confirm DevTools console
+   capture actually works cleanly - verify a simple, known message
+   (e.g. add a fresh, obvious one-time test log) shows up correctly in
+   an exported file BEFORE relying on it for real diagnosis again.
+3. Once console capture is confirmed reliable, re-run the room A/B
+   isolation test with the existing [FOLDER-CLEANUP-DIAG] logging
+   active, specifically capturing the WORKBENCH console (not the
+   dashboard one), to get the real before/after folder-list evidence
+   this session was trying to obtain.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
