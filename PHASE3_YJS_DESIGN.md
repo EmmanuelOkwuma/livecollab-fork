@@ -513,6 +513,105 @@ verified data capture yet.
    dashboard one), to get the real before/after folder-list evidence
    this session was trying to obtain.
 
+## 11. Dashboard reconnect loop: real cause found - a 60-second Clerk token lifetime
+
+Traced the dashboard socket's repeated disconnect/reconnect cycle to
+its actual source code, not guessed. Real file location, worth noting
+since it's genuinely separate from everything else touched this
+session: `src/vs/code/electron-browser/workbench/livecollab-bootstrap.html`
+(the dashboard is a standalone HTML/JS page, not part of the
+TypeScript-compiled `src/vs/workbench/contrib/livecollab/` code the
+rest of tonight's work lived in).
+
+Confirmed: `lcConnect()` mints a fresh auth token (`lcMintToken()`, via
+the same `vscode:livecollab-mint-token` IPC call traced earlier this
+project) on every connection AND on every reconnection (it's passed as
+the socket.io `auth` callback, which re-runs on each reconnect
+attempt). The socket is configured with `reconnection: true`, so any
+disconnect is followed by an automatic reconnect using a freshly-minted
+token.
+
+**Real root cause, confirmed by decoding an actual JWT from tonight's
+own console output**: the Clerk session token has an exact 60-second
+lifetime (`exp - iat = 60` seconds, verified by direct decode, not
+approximated). This is Clerk's own token design (short-lived session
+tokens, meant to be refreshed frequently), not something this project's
+own code chose. This directly explains the repeating
+`disconnected`/`connected` pattern seen in tonight's dashboard console
+export - it lines up with a roughly-60-second cycle.
+
+**Not yet confirmed**: whether the disconnect is caused by the SERVER
+actively dropping the connection once it detects the token has expired
+(most likely, given standard JWT-auth patterns), or something else.
+Also not yet confirmed: whether this SAME mechanism is responsible for
+tonight's more serious room-isolation symptom (Room B showing Room A's
+content, empty Room ID/Members) - it's a real, plausible contributing
+factor (a connection dropping mid-room-switch could easily produce
+stale/empty UI state), but this is not yet proven as that bug's root
+cause, only a credible, evidence-backed lead.
+
+**Real, concrete next-session fix candidate**: proactively refresh the
+token and reconnect BEFORE the 60-second expiry (e.g. a timer that
+re-authenticates a few seconds early), rather than only reacting AFTER
+a disconnect already happened. This would eliminate the repeated
+disconnect cycle entirely rather than just handling it gracefully
+after the fact. Real open question to resolve first: does the ACTUAL
+room-workbench socket (in `livecollabService.ts`, separate from this
+dashboard one) have the SAME 60-second-token vulnerability, and if so,
+could a token expiring mid-room-session explain the room-isolation
+symptom directly? This needs to be checked with real evidence, not
+assumed, before writing a fix.
+
+## 12. The workbench socket has the SAME 60-second-token vulnerability, with a real auto-rejoin race
+
+Checked the real, actual `connect()` method in `livecollabService.ts`
+(not the dashboard's separate code) directly - confirmed it uses the
+identical pattern: the socket's `auth` callback re-mints a fresh token
+via `refreshToken()` on every connection AND every reconnection. Given
+section 11's confirmed 60-second Clerk token lifetime, this socket is
+subject to the exact same repeated disconnect/reconnect cycle - this
+directly explains a pattern already seen and logged as unexplained
+EARLIER this project (`socket disconnected, reason: transport close` /
+`socket connected` / `reconnected - re-joining room` repeating in the
+workbench console).
+
+**Real, structurally significant detail found in the same code**: on
+every `connect` event, if `this._roomId` is currently set, the code
+automatically re-emits `room:join` for that room ID - this is
+INTENTIONAL, documented behavior (comment references issue #19,
+ensuring a reconnected socket gets re-subscribed to its room
+server-side). This is correct behavior in isolation.
+
+**Real, concrete hypothesis connecting this to the room-isolation bug
+observed this session** (Room B showing Room A's content, empty Room
+ID/Members panel): if an automatic reconnect (triggered by the
+60-second token expiry, NOT by user action) happens to fire during or
+immediately around a genuine, user-initiated room switch (leaving
+Room A, joining Room B), there is a real, plausible race between two
+things trying to control the SAME `this._roomId`/join state at once -
+the deliberate switch, and the automatic reconnect's own re-join
+logic (which could fire using a STALE `_roomId` value if the timing
+lines up wrong). This is NOT yet confirmed with runtime evidence -
+it's a genuinely stronger, more precise, code-evidenced hypothesis
+than before, not a proven root cause.
+
+**Real next-session task, concrete and ordered**:
+1. Confirm whether this race is real: reproduce the room A/B
+   isolation bug WHILE deliberately watching the clock - if it
+   reliably happens (or happens MORE often) when a room switch occurs
+   close to a 60-second boundary since the last connect/reconnect,
+   that's real, strong evidence for this exact mechanism.
+2. If confirmed, the real fix is the SAME one proposed in section 11
+   for the dashboard: proactively refresh the token and reconnect
+   BEFORE the 60-second expiry, removing the reactive
+   disconnect-then-reconnect cycle (and its associated auto-rejoin
+   race) entirely, rather than trying to make the reactive path safe
+   under racing conditions.
+3. Regardless of whether this specific race is confirmed, the
+   60-second reactive reconnect cycle itself is real, confirmed, and
+   worth fixing on its own merits (it's real, unnecessary network/auth
+   overhead every single minute, socket or no socket).
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
