@@ -66,10 +66,23 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 			if (realEditorIdentifiers.length > 0) {
 				this.editorService.closeEditors(realEditorIdentifiers);
 			}
+			// TEMPORARY DIAGNOSTIC 2026-08-21: real evidence needed before
+			// writing a fix - is this "two real folders present before
+			// cleanup runs" (a race on the way in) or "cleanup ran but only
+			// removed one" (a bug in the removal logic itself)? Re-queries the
+			// ACTUAL, CURRENT folder list at this exact moment (not the
+			// earlier-computed realFolderIndex/realFolder, which could be
+			// stale by now) so the before/after picture is real, not assumed.
+			const foldersBefore = this.workspaceContextService.getWorkspace().folders;
+			console.log('[FOLDER-CLEANUP-DIAG] BEFORE removal, full folder list:', foldersBefore.map(f => ({ uri: f.uri.toString(), scheme: f.uri.scheme, name: f.name })));
 			if (realFolderIndex !== -1) {
 				console.log('[LiveCollab] room left - removing attached real folder');
 				this.workspaceEditingService.updateFolders(realFolderIndex, 1);
+			} else {
+				console.log('[FOLDER-CLEANUP-DIAG] realFolderIndex was -1, no removal attempted');
 			}
+			const foldersAfter = this.workspaceContextService.getWorkspace().folders;
+			console.log('[FOLDER-CLEANUP-DIAG] AFTER removal, full folder list:', foldersAfter.map(f => ({ uri: f.uri.toString(), scheme: f.uri.scheme, name: f.name })));
 		}));
 
 		// Scenario 1 restore: when a room join succeeds, re-apply any saved
