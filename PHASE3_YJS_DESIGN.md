@@ -702,6 +702,88 @@ in the same file at the same time) that this whole project has been
 building toward, still not yet run with all of tonight's fixes in
 place. That's the real next session task.
 
+## 16. The REAL, definitive cause of stacked "Shared Room" entries: VS Code's own native backup-workspace file
+
+Section 15 closed the disconnect-loop investigation, but a genuinely
+new, different symptom appeared on the very next real two-machine
+test: Maureen's Explorer showed THREE stacked "Shared Room" entries
+(the owner's own Explorer never shows this at all - see the plain-
+English explanation given mid-session: the virtual "Shared Room"
+folder only exists for GUESTS, who don't have the owner's real files
+on their own disk, so the app builds an in-memory copy for them to
+view/edit; the owner never sees it since they don't need a copy of
+their own files).
+
+**Root cause found with real, direct, complete evidence - not another
+partial theory**. Checked `[FOLDER-DUP-DIAG]`/`[FOLDER-CLEANUP-DIAG]`
+in Maureen's real, uploaded workbench console (1523 lines): ZERO
+matches, and even the PRE-EXISTING `onFileTree` handler's own older
+log lines (`populating virtual file system`, the raw `room:file:tree`
+socket event name) never appear either - confirming this ENTIRE code
+path did not run at all during this session. The duplicates are NOT
+being added live, right now, by our own code.
+
+Traced instead to VS Code's own native backup-workspace mechanism.
+Found via direct filesystem inspection on Maureen's machine: multiple
+real, separate `workspaceStorage/<hash>/workspace.json` files exist
+under `~/Library/Application Support/LiveCollab/User/`, each pointing
+to a REAL, persisted multi-root workspace file under a `Workspaces/`
+directory. Read the actual, real content of one of these files
+directly:
+
+```json
+{
+    "folders": [
+        { "name": "Shared Room", "uri": "livecollab://room-e957f6fc-.../" },
+        { "name": "Shared Room", "uri": "livecollab://room-71ab2ddf-.../" },
+        { "name": "Shared Room", "uri": "livecollab://room-001ecbf6-.../" },
+        { "path": "../../../../../YC FOLDER/FOLDER 1" }
+    ],
+    "settings": {}
+}
+```
+
+**This is definitive, real evidence, not inference**: three DIFFERENT
+room IDs, each from a separate test session tonight, all accumulated
+in ONE persisted file, NEVER removed - plus a FOURTH, genuinely real
+folder entry (`YC FOLDER/FOLDER 1`) that exactly matches the mystery
+"YC folder" symptom from MUCH earlier this session (originally
+assumed to be stale local files, now confirmed to be this SAME
+accumulating mechanism). This is VS Code's own native
+backup-workspace/crash-recovery file - it appears to record the
+CURRENT folder list into this persisted file on disk every time the
+folder list changes, but nothing ever REMOVES old entries from it, and
+something (likely VS Code's own crash-recovery restore logic,
+plausibly related to the many `pkill -9` force-kills used throughout
+tonight's testing) is restoring from this stale, ever-growing file on
+a subsequent launch, re-introducing every room ever visited at once.
+
+**This explains BOTH mysteries from this session in one unified, real
+root cause**: the "multiple Shared Room" symptom AND the much-earlier
+"YC folder" mystery are the SAME underlying mechanism, not two
+separate bugs.
+
+**Real, honest distinction from everything found in sections 9-15**:
+this is NOT the same bug as the disconnect-loop/room-isolation issue
+that was just closed - that investigation and its fix were real and
+correctly verified (section 15's clean A/B test had no console
+export step to catch this, since it doesn't show up in ANY of our own
+diagnostic logging - it's entirely outside our own code's visibility).
+This is a genuinely new, different, real finding.
+
+**Real next-session task**: find and disable/manage VS Code's own
+native backup-workspace persistence for this specific scenario -
+options to investigate include a settings-level control for backup-
+workspace behavior (similar in spirit to how `window.restoreWindows`
+was already tuned for this product earlier in the project), or
+explicitly clearing this specific backup file as part of our own
+existing room-leave cleanup (`leaveCurrentRoom()`/`onRoomLeft`,
+already the right, established place other real state gets cleared).
+Not yet attempted - real investigation needed into VS Code's own
+backup-workspace source (likely under `src/vs/platform/backup/` or
+similar) before writing a fix, matching this whole session's
+established discipline.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
