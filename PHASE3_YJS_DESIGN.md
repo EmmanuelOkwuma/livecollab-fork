@@ -661,6 +661,47 @@ next session task: re-run the original room A/B switching test now
 that both sockets are stable, and confirm directly whether that
 symptom is gone, unchanged, or improved.
 
+## 15. Room-isolation bug confirmed FIXED - the whole investigation closes
+
+Live re-test with both sockets stable, real reproduction of the exact
+original scenario: created Room A, opened a real folder ("Folder 1"
+with test.js), left to dashboard, created Room B, opened a different
+real folder ("Folder 2" with index.js). Confirmed directly: Room B did
+NOT show Room A's content, and returning to Room A did NOT show Room
+B's content either - real, clean isolation in both directions. Room ID
+and Members panel both populated correctly throughout, unlike every
+earlier attempt this session.
+
+**This confirms the full chain of reasoning from sections 9 through
+15**: what looked at first like a folder-cleanup bug (section 9,
+wrong code path investigated), then a genuine but separately-confirmed
+room-isolation failure (section 10), was actually a downstream
+symptom of the 60-second Clerk token causing repeated
+disconnect/reconnect cycles on both sockets (sections 11-12), which
+raced against genuine user-initiated room switches. Fixing the root
+cause (proactive token refresh, sections 12-14) fixed the visible
+symptom too - confirmed here with a real, direct reproduction, not
+assumed from the socket fix alone.
+
+**Real, honest note on process**: this took several real, wrong turns
+(the original virtual-folder theory in section 9, the unreliable
+console exports in section 10) before landing on the actual root
+cause - but each wrong turn was checked with real evidence and ruled
+out cleanly rather than guessed past, and the eventual fix was found
+by following genuine, confirmed clues (a decoded JWT, a real code
+read of the reconnect logic) rather than luck. The investigation that
+started as "why do folders duplicate" ended up finding and fixing a
+real, more fundamental instability affecting the whole app's
+connection reliability, not just the one symptom that was originally
+reported.
+
+**This closes the disconnect-loop / room-isolation investigation
+(sections 9-15). Phase 3's remaining real work is separate from this
+thread**: the actual Yjs concurrent-editing test (two people typing
+in the same file at the same time) that this whole project has been
+building toward, still not yet run with all of tonight's fixes in
+place. That's the real next session task.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
