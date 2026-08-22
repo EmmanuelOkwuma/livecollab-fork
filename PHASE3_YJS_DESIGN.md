@@ -612,6 +612,36 @@ than before, not a proven root cause.
    worth fixing on its own merits (it's real, unnecessary network/auth
    overhead every single minute, socket or no socket).
 
+## 13. Real, confirmed success: proactive token refresh eliminates the workbench socket disconnect cycle
+
+Live test result, real evidence not assumed: exported the workbench
+console after joining a room and letting it sit idle for several
+minutes. Confirmed via direct grep: ZERO occurrences of "socket
+disconnected" anywhere in the entire log. The socket connected exactly
+once, joined the room once, and stayed connected throughout - the
+repeating disconnect/connect/re-join cycle observed in every earlier
+session is genuinely gone for the room-workbench socket.
+
+This confirms the section 11-12 hypothesis was correct: the 60-second
+Clerk token lifetime WAS the real, primary cause of the repeated
+disconnects, not some other, separate instability. The proactive
+45-second refresh (section 12's fix) genuinely solves it.
+
+**Real, remaining open items**:
+- The DASHBOARD socket (separate file,
+  `livecollab-bootstrap.html`, NOT touched by this fix) still shows
+  the same repeating disconnect/connect cycle - confirmed in the same
+  test round, a separate log from the dashboard console. This is
+  EXPECTED, not a failure - the same fix needs to be applied there
+  too, using the same pattern (proactive refresh timer), as a
+  follow-up.
+- Whether this also resolves or reduces the room-isolation bug (Room B
+  showing Room A's content) is not yet directly re-tested - the
+  hypothesized race depended on a reconnect firing during a room
+  switch, which should now be far less likely with disconnects
+  eliminated, but this needs its own real confirmation via a fresh
+  A/B room-switch test, not assumed from this result alone.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
