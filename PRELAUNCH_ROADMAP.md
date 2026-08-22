@@ -345,6 +345,22 @@ status-bar room name, and plausibly #3.
 - [ ] Rate limiting — AI requests and socket connections. Currently unbuilt
       anywhere. Even a handful of aggressive users could run costs or
       connection counts into a bad place with zero protection.
+- [ ] Room-aware recovery model, replacing local hot-exit snapshots.
+      Real context (PHASE3_YJS_DESIGN.md section 16): VS Code's native
+      hot-exit backup was found to be the actual root cause of a real
+      folder-accumulation bug (a single-player crash-recovery feature
+      with no concept of rooms, silently snapshotting whatever folders
+      were open and never clearing old ones as rooms were left). Fixed
+      short-term by disabling hot exit entirely, since it fits nothing
+      about how this product actually works. Real, correct long-term
+      direction (from a live product discussion, not yet designed):
+      LiveCollab's actual recovery model should be room-aware and
+      server-backed, not a local file snapshot - the live-synced
+      content already IS the durable copy (on the server and on every
+      other member's machine), so a crashed client should recover by
+      rejoining and re-syncing from the server's authoritative state,
+      not by reading a local file. This is real, Phase 4+ work, not
+      urgent - logged here so the idea isn't lost, not scheduled yet.
 - [ ] Deletion system — rooms/accounts/files/invites/memberships, soft-delete
       + grace period. Design for the sharp edges up front:
       - [ ] Concurrent deletion (two people delete the same room at once, or
