@@ -69,6 +69,14 @@ export class LiveCollabService extends Disposable {
 	private _lastMembers: ILiveCollabMember[] = [];
 	private _fileCache: Map<string, string> = new Map();
 	private _connecting = false;
+	// PHASE3_YJS_DESIGN.md sections 11-12: the Clerk session token has a
+	// confirmed 60-second lifetime (decoded directly from a real JWT).
+	// This timer proactively re-mints it well before expiry, so a stale
+	// token never sits waiting to cause a reactive disconnect - regardless
+	// of whether that disconnect is server-triggered by expiry (not yet
+	// confirmed) or something else, keeping this warm is a safe, real
+	// improvement either way.
+	private _tokenRefreshTimer: ReturnType<typeof setInterval> | undefined;
 
 	private readonly _onConnected = this._register(new Emitter<void>());
 	readonly onConnected: Event<void> = this._onConnected.event;
@@ -203,6 +211,12 @@ export class LiveCollabService extends Disposable {
 		this.socket.on('connect', () => {
 			this._connecting = false;
 			console.log('[LiveCollab] socket connected, user:', this._displayName);
+			// Proactive refresh: real, 60s-confirmed token lifetime, refresh
+			// at 45s to leave a genuine safety margin. Cleared/restarted here
+			// (not just on first connect) so a reconnect always gets a fresh
+			// timer too, never two overlapping ones.
+			if (this._tokenRefreshTimer) { clearInterval(this._tokenRefreshTimer); }
+			this._tokenRefreshTimer = setInterval(() => { this.refreshToken(); }, 45000);
 			// If we were already in a room, this is a RECONNECT: re-join so the server
 			// re-subscribes this socket to the room. room:join only fired on first connect
 			// before, so after a reconnect the socket was live but not in any room. (#19)
@@ -223,6 +237,7 @@ export class LiveCollabService extends Disposable {
 		this.socket.on('disconnect', (reason: string) => {
 			this._connecting = false;
 			console.log('[LiveCollab] socket disconnected, reason:', reason);
+			if (this._tokenRefreshTimer) { clearInterval(this._tokenRefreshTimer); this._tokenRefreshTimer = undefined; }
 			this._onDisconnected.fire();
 		});
 		this.socket.on('room:members', ({ members }: { members: ILiveCollabMember[] }) => {
