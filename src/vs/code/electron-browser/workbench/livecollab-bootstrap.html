@@ -1234,6 +1234,7 @@
 		const SERVER_URL = 'https://live-collab-production.up.railway.app';
 		let lcSocket = null;
 		let lcConnecting = false;
+		let lcTokenRefreshTimer = null;
 
 		async function lcMintToken() {
 			try {
@@ -1256,9 +1257,23 @@
 						transports: ['websocket'],
 						reconnection: true
 					});
-				lcSocket.on('connect', () => { lcConnecting = false; console.log('[LiveCollab] dashboard socket connected'); lcRefreshRooms(); });
+				lcSocket.on('connect', () => {
+					lcConnecting = false;
+					console.log('[LiveCollab] dashboard socket connected');
+					lcRefreshRooms();
+					// PHASE3_YJS_DESIGN.md sections 11-13: same real, confirmed
+					// fix as the workbench socket - Clerk token has a confirmed
+					// 60-second lifetime, refresh at 45s so it never goes stale
+					// while connected. Cleared/restarted here so a reconnect
+					// never leaves two timers running.
+					if (lcTokenRefreshTimer) { clearInterval(lcTokenRefreshTimer); }
+					lcTokenRefreshTimer = setInterval(() => { lcMintToken(); }, 45000);
+				});
 				lcSocket.on('connect_error', (e) => { lcConnecting = false; console.warn('[LiveCollab] dashboard socket error:', e && e.message); });
-				lcSocket.on('disconnect', () => { console.log('[LiveCollab] dashboard socket disconnected'); });
+				lcSocket.on('disconnect', () => {
+					console.log('[LiveCollab] dashboard socket disconnected');
+					if (lcTokenRefreshTimer) { clearInterval(lcTokenRefreshTimer); lcTokenRefreshTimer = null; }
+				});
 				return lcSocket;
 			} catch(e) { lcConnecting = false; return null; }
 		}
