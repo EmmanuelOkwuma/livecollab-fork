@@ -784,6 +784,57 @@ backup-workspace source (likely under `src/vs/platform/backup/` or
 similar) before writing a fix, matching this whole session's
 established discipline.
 
+## 17. Section 16's fix was WRONG - confirmed with a real A/B test, reverted, real correction recorded
+
+Real, honest correction, not a minor caveat. Section 16's fix (setting
+`files.hotExit` default to OFF) was tested live for the first time
+this session and broke a completely different, core feature: "Open
+Folder" stopped working entirely, on BOTH machines, every single
+attempt, with no error anywhere in either console. The picker dialog
+itself worked fine (confirmed directly); the folder simply never got
+attached to the workspace afterward - confirmed via the section 9
+diagnostic (`[FOLDER-CLEANUP-DIAG]`), which showed the real,
+underlying folder list as genuinely empty both before and after the
+attempt, not just a display glitch.
+
+**Real, clean A/B test performed before concluding anything**:
+reverted the setting back to its stock default (`ON_EXIT`), recompiled,
+retested the exact same action - "Open Folder" worked immediately.
+This confirms a real, causal, if unexpected, dependency: VS Code's
+folder-attachment mechanism relies on the hot-exit/backup service
+being active in some way not yet understood. Turning off hot exit
+entirely was too blunt an instrument - it fixed the original
+accumulation symptom by breaking the feature the accumulation was
+about in the first place.
+
+**Reverted permanently, not just for the test.** The original section
+16 problem - stale room folders silently accumulating in VS Code's
+hot-exit backup file across sessions - is REAL and still UNSOLVED.
+What's ruled out is the specific fix attempted: disabling hot exit
+globally is not viable for this product, since "Open Folder" is
+core, load-bearing functionality.
+
+**Real, honest process note**: section 16's reasoning was sound and
+well-evidenced for the PROBLEM it diagnosed (the accumulation
+mechanism was real, precisely traced, and correctly understood) - the
+FIX chosen from that correct diagnosis turned out to have a real,
+unexpected side effect that could only be found by actually testing
+it live, which is exactly why this project tests every real fix
+before considering it done, even when the reasoning behind it seems
+solid.
+
+**Real next-session task**: find a more surgical fix for the
+accumulation problem that does NOT disable hot exit globally. Real,
+concrete candidates to investigate: (a) explicitly unregistering this
+specific room's own backup entry when leaving the room, using the
+real `registerFolderBackup`/related methods already found in
+`backupMainService.ts` during this investigation - clearing our own
+specific entry rather than disabling the whole mechanism; (b)
+investigating WHY "Open Folder" depends on hot exit being active at
+all, which might reveal a more precise place to intervene. Neither
+attempted yet - real investigation needed before writing another fix,
+given tonight's real lesson about testing before concluding.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
