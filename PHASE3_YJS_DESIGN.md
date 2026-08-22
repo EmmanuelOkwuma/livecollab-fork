@@ -642,6 +642,25 @@ disconnects, not some other, separate instability. The proactive
   eliminated, but this needs its own real confirmation via a fresh
   A/B room-switch test, not assumed from this result alone.
 
+## 14. Both sockets confirmed fixed - the disconnect-loop thread is closed
+
+Live re-test, real evidence: exported both consoles after applying the
+same proactive-refresh fix to the dashboard socket. Dashboard log: 5
+lines total, connected once, zero disconnects. Workbench log: 1040
+lines, zero disconnects (confirmed via direct grep on both files, not
+skimmed). Both sockets - the two separate places this bug existed -
+are now confirmed fixed with real data across two independent test
+rounds.
+
+This closes the disconnect-loop investigation from sections 11-13.
+The real, remaining, still-open thread from this whole investigation
+is whether this also resolves the original room-isolation symptom
+(Room B showing Room A's content, empty Room ID/Members) - that was
+always a hypothesis connected to this bug, not proven itself. Real
+next session task: re-run the original room A/B switching test now
+that both sockets are stable, and confirm directly whether that
+symptom is gone, unchanged, or improved.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
