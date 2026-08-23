@@ -835,6 +835,113 @@ all, which might reveal a more precise place to intervene. Neither
 attempted yet - real investigation needed before writing another fix,
 given tonight's real lesson about testing before concluding.
 
+## 19. Section 18's fix confirmed present on Maureen's build - blocked by a real, separate auth failure before it could be tested
+
+Attempted the real live test for sections 16-18's fix (deleteUntitledWorkspace
+on room leave). Blocked before it could even start: Maureen joined Room A
+and her workbench showed the completely blank "No folder opened" welcome
+screen - no Room ID, no Members, nothing, not even an empty room state.
+Her dashboard had signed in successfully (confirmed in her dashboard
+console), but the workbench side never showed any sign of the room join.
+
+**Build version ruled out with real, direct evidence, not assumed**:
+checked the actual compiled JS in her installed app for the literal string
+`deleteUntitledWorkspace` (the real function name from section 18's fix) -
+found 3 occurrences, confirming she is genuinely running tonight's latest
+build, not an old one.
+
+**Real, separate, likely cause identified but not yet independently
+verified**: the workbench console reportedly showed the extension host
+crash-looping, with the first real error being `could not mint Clerk
+token` - meaning her workbench-side authentication never actually
+completed, despite the dashboard side succeeding. Without a valid token,
+the socket can't connect, the room can't be joined, and the virtual
+filesystem never populates - which would fully explain the completely
+blank state observed (not a room-isolation bug, not related to sections
+16-18 at all, a distinct authentication bridge failure).
+
+**This is confirmed to be a genuinely different, separate problem from
+everything else this session** - the sections 16-18 fix is real,
+compiled, present on her machine, and still has not been cleanly tested,
+because this authentication issue blocks the room join entirely before
+the fix's own logic would ever run.
+
+**Real next-session task**: root-cause the workbench-side Clerk token
+minting failure specifically on Maureen's machine - real, concrete
+starting points: (1) get and directly read her actual workbench console
+export (not yet independently verified by Claude this session - the
+diagnosis above was reported, not directly confirmed via an uploaded
+log), (2) check whether this is machine-specific (a stale/corrupted
+local Clerk session on her machine specifically) or a real, reproducible
+regression in the sign-in IPC bridge referenced in this project's much
+earlier history (2026-08-09, "SIGN-IN BUG — CONFIRMED FIXED"). Once
+resolved, the sections 16-18 fix still needs its first real live test,
+which has not yet happened.
+
+## 20. Honest session close-out - what's actually proven vs. still open, stated plainly
+
+This session ran long and covered a lot of ground. Before closing, an
+honest, unsoftened accounting of what's real and what isn't, because
+carrying false confidence into the next session is worse than an
+accurate but less flattering picture.
+
+**Genuinely proven, with real, direct evidence:**
+- The 60-second Clerk token expiry causing repeated disconnects on
+  both the workbench and dashboard sockets - fixed with a proactive
+  45-second refresh, confirmed via exported console logs showing zero
+  disconnects, on two separate, independent test rounds.
+- Room A/B content isolation (no leaking between rooms) - tested once,
+  directly, immediately after the token-refresh fix landed, with a
+  clean result.
+
+**Fixed, but not yet re-verified after later changes:**
+- The Yjs seed-timing race (guests not seeing pre-existing content
+  until the next edit).
+- Yjs memory bleeding between rooms sharing a filename.
+
+**Attempted, wrong, corrected:**
+- Disabling `files.hotExit` entirely to solve stale folder
+  accumulation - broke "Open Folder" as a real, confirmed side effect
+  via a clean A/B test. Reverted. The original accumulation problem
+  is real and was NOT solved by this attempt.
+
+**Written, compiled clean, never tested:**
+- The `deleteUntitledWorkspace`-on-room-leave fix (sections 16-18) -
+  confirmed present in Maureen's actual compiled build via direct
+  string search, but never actually run through a real test, because
+  a separate, unrelated problem blocked it first.
+
+**Currently open, blocking everything downstream:**
+- Maureen's workbench cannot authenticate. Her dashboard sign-in
+  works correctly and repeatedly (confirmed in her own logs, real
+  Clerk callback data present). Her workbench reports "no Clerk
+  session found" and the extension host crash-loops immediately
+  after. This is a real, internal dashboard-to-workbench handoff
+  failure occurring entirely within her own single running app, not
+  a cross-machine issue - confirmed identical build via direct string
+  search for `deleteUntitledWorkspace` (present, 3 occurrences).
+  Root cause NOT yet found. Two real, incorrect theories were
+  proposed and corrected this session before landing on "not yet
+  understood, needs a targeted diagnostic" as the honest state.
+
+**The actual Phase 3 goal - two people typing simultaneously in the
+same file, both edits surviving - has not been attempted even once
+this session.** Every real fix made tonight was necessary
+infrastructure work discovered by trying to reach that test, not the
+test itself.
+
+**Real, bounded, five-minute next-session starting task, and nothing
+before it**: add a diagnostic log at the exact moment the main
+process sends the `vscode:livecollab-clerk-user` IPC event to
+`dashboardView.webContents` - log that the send fired, and log which
+URL `dashboardView.webContents` was actually showing at that moment.
+This directly answers whether the send happens at all on Maureen's
+machine and, if so, whether it's targeting the right destination -
+replacing the two incorrect theories proposed tonight with real
+evidence instead of more guessing. Once that diagnostic reveals the
+real cause and it's fixed, retest sections 16-18's fix live for the
+first time, then move directly to the actual concurrent-editing test.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
