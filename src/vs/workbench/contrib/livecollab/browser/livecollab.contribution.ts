@@ -243,8 +243,28 @@ class LiveCollabStartupOwner extends Disposable implements IWorkbenchContributio
 			// room-joining to be re-callable, not one-time.
 			const ipc = (window as any).vscode?.ipcRenderer;
 			if (!ipc) { return; }
-			const dvbJwt = (() => { try { return localStorage.getItem('__clerk_db_jwt') || ''; } catch { return ''; } })();
-			if (!dvbJwt) { console.log('[LiveCollab] no Clerk session found'); return; }
+			// Real, confirmed race (PHASE3_YJS_DESIGN.md section 20): this runs
+			// on LifecyclePhase.Restored, a purely internal VS Code milestone
+			// with no relation to whether the EXTERNAL browser sign-in flow has
+			// actually finished writing __clerk_db_jwt to localStorage yet.
+			// windowImpl.ts's own comment claims this "works correctly even
+			// though it loads before sign-in necessarily completes" - traced
+			// and confirmed that claim had no actual mechanism behind it: this
+			// was a single, one-shot read with no retry. Fast path (session
+			// already present, the common case) is unchanged - only retries
+			// when the first read genuinely finds nothing. Bounded: 5 attempts,
+			// 500ms apart, 2.5s total ceiling - not an infinite or aggressive
+			// poll, real cost only paid during the actual race window.
+			const readDvbJwt = (): string => { try { return localStorage.getItem('__clerk_db_jwt') || ''; } catch { return ''; } };
+			let dvbJwt = readDvbJwt();
+			if (!dvbJwt) {
+				for (let attempt = 1; attempt <= 5 && !dvbJwt; attempt++) {
+					await new Promise<void>(resolve => setTimeout(resolve, 500));
+					dvbJwt = readDvbJwt();
+					if (dvbJwt) { console.log('[LiveCollab] Clerk session found on retry', attempt); }
+				}
+			}
+			if (!dvbJwt) { console.log('[LiveCollab] no Clerk session found after retries'); return; }
 			const clerkJwt = await ipc.invoke('vscode:livecollab-mint-token', dvbJwt) as string | null;
 			if (!clerkJwt) { console.log('[LiveCollab] could not mint Clerk token'); return; }
 			const displayName = (window as any)._dashDisplayName || (window as any)._dashFullName || 'User';
