@@ -5,7 +5,7 @@
 
 import { Disposable } from '../../../../base/common/lifecycle.js';
 import { IWorkbenchContribution } from '../../../common/contributions.js';
-import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
+import { IWorkspaceContextService, IWorkspaceIdentifier } from '../../../../platform/workspace/common/workspace.js';
 import { livecollabService } from './livecollabService.js';
 import { livecollabFileSystemProvider, LIVECOLLAB_SCHEME } from './livecollabFileSystemProvider.js';
 import { IWorkspaceEditingService } from '../../../services/workspaces/common/workspaceEditing.js';
@@ -13,6 +13,7 @@ import { IFileService } from '../../../../platform/files/common/files.js';
 import { URI } from '../../../../base/common/uri.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
 import { EditorsOrder } from '../../../common/editor.js';
+import { IWorkspacesService } from '../../../../platform/workspaces/common/workspaces.js';
 
 export class LiveCollabFolderContribution extends Disposable implements IWorkbenchContribution {
 
@@ -23,6 +24,7 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 		@IFileService private readonly fileService: IFileService,
 		@IWorkspaceEditingService private readonly workspaceEditingService: IWorkspaceEditingService,
 		@IEditorService private readonly editorService: IEditorService,
+		@IWorkspacesService private readonly workspacesService: IWorkspacesService,
 	) {
 		super();
 
@@ -41,7 +43,7 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 		// Room 1's folder was still showing after switching to Room 2). No
 		// stored reference to "the room's folder" exists anywhere in this
 		// codebase - read the live workspace state at leave-time instead.
-		this._register(livecollabService.onRoomLeft((leftRoomId) => {
+		this._register(livecollabService.onRoomLeft(async (leftRoomId) => {
 			const folders = this.workspaceContextService.getWorkspace().folders;
 			const realFolderIndex = folders.findIndex(f => f.uri.scheme !== LIVECOLLAB_SCHEME);
 			const realFolder = realFolderIndex !== -1 ? folders[realFolderIndex] : undefined;
@@ -83,6 +85,28 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 			}
 			const foldersAfter = this.workspaceContextService.getWorkspace().folders;
 			console.log('[FOLDER-CLEANUP-DIAG] AFTER removal, full folder list:', foldersAfter.map(f => ({ uri: f.uri.toString(), scheme: f.uri.scheme, name: f.name })));
+			// PHASE3_YJS_DESIGN.md sections 16-18: real root cause of stale room
+			// folders accumulating across sessions - updateFolders() above only
+			// edits the LIVE, in-memory workspace, it never touches the separate,
+			// disk-persisted untitled-workspace identity VS Code creates the first
+			// time a folder gets added here. That identity file is what silently
+			// accumulated every room ever visited (confirmed via direct filesystem
+			// read on a real machine). Real fix: explicitly delete THIS workspace's
+			// own untitled-workspace identity on a clean room leave, using the
+			// same id/configuration already available from getWorkspace() - no new
+			// IPC needed, IWorkspacesService already exposes exactly this.
+			// KNOWN, NAMED GAP: this only runs on a clean leave. A force-kill,
+			// crash, or unclean exit skips this entirely, same as it always has -
+			// not solved here, real fix for that case is separate future work.
+			const currentWorkspace = this.workspaceContextService.getWorkspace();
+			if (currentWorkspace.configuration) {
+				const workspaceIdentifier: IWorkspaceIdentifier = { id: currentWorkspace.id, configPath: currentWorkspace.configuration };
+				try {
+					await this.workspacesService.deleteUntitledWorkspace(workspaceIdentifier);
+				} catch (e) {
+					console.warn('[LiveCollab] could not delete untitled workspace identity on room leave:', e);
+				}
+			}
 		}));
 
 		// Scenario 1 restore: when a room join succeeds, re-apply any saved
