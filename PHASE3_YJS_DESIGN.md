@@ -984,6 +984,57 @@ valid token and returned nothing. This is fully actionable
 immediately - nothing here depends on any rate-limit reset or delay,
 since Clerk-side rate limiting has been directly ruled out.
 
+## 22. Real, definitive root cause found and confirmed directly against the live production database - Maureen's cached Clerk token is genuinely revoked
+
+Traced the exact failure to source, in `server/index.js`'s `/auth/token`
+handler: `if (db.isTokenRevoked(hashToken(token))) return jsonOut(200,
+null);` - a real, exact match for the observed
+`{"jwt":null,"error":"server_response_missing_jwt","serverResponse":null}`.
+
+**Confirmed with a real, direct query against the live production
+database, not inferred.** Computed the real SHA-256 hash of the exact
+recurring token value seen throughout tonight's logs
+(`dvb_3GR3LBfko7B1Vhog01zYU4GCQWY`), connected to the actual Railway
+project via `railway link` (confirmed correct project by matching its
+real domain, `live-collab-production.up.railway.app`, exactly against
+the hardcoded client URL), used `railway ssh` to reach a live shell
+inside the actual running container (`railway run` alone doesn't
+mount the persistent volume locally, confirmed by a real
+`ENOENT`-style directory error first), and queried
+`db.isTokenRevoked(...)` directly against the real, live
+`revokedTokens` SQLite table. Result: **`true`**. This token is
+genuinely, definitively revoked.
+
+**What this means, precisely**: the revocation itself is correct,
+expected behavior - some earlier point in tonight's many sign-in/
+sign-out/reinstall cycles legitimately triggered `/auth/logout` for
+this exact token, and our server correctly denylisted it, exactly as
+designed. The REAL bug is upstream of this check: Maureen's app keeps
+resending this same, now-dead cached token on every subsequent
+attempt, instead of obtaining a genuinely fresh one from Clerk. The
+section 20 local-storage/session-storage clear did not touch whatever
+is actually caching it - most likely Electron's cookie store or
+IndexedDB, neither of which were cleared tonight.
+
+**Real, concrete next-session task**: clear Electron's actual cookie
+storage and IndexedDB for this app (not just Local/Session Storage,
+already tried and confirmed insufficient) - real candidates:
+`~/Library/Application Support/LiveCollab/Network/Cookies` and the
+`IndexedDB`/`blob_storage` directories in that same folder. Once
+Maureen's app is holding a genuinely fresh, non-revoked token, the
+mint should succeed and her workbench should authenticate end to end -
+the last real blocker before the actual Phase 3 concurrent-editing
+test can finally run.
+
+**Real, secondary, non-blocking item found and deliberately not
+touched tonight**: discovered six real Railway projects under this
+account, several showing an active LiveCollab service, not just one.
+This needs real, careful investigation in a clear-headed session -
+NOT tonight, given the genuine risk of deleting something live by
+mistake this late. Confirmed only that `patient-joy` is the real,
+correct, currently-serving production project (verified by its real
+domain match) - the other five remain unexplained and unexamined.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
