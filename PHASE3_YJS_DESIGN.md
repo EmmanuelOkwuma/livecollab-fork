@@ -942,6 +942,48 @@ evidence instead of more guessing. Once that diagnostic reveals the
 real cause and it's fixed, retest sections 16-18's fix live for the
 first time, then move directly to the actual concurrent-editing test.
 
+## 21. Diagnostic fix confirmed working live - real root cause narrowed to our own server, not Clerk
+
+The section 20 diagnostic fix worked exactly as intended on the very
+first real test. Maureen's exported console showed the real reason
+directly, no terminal access needed: `[LiveCollab] could not mint
+Clerk token - reason: server_response_missing_jwt
+{"jwt":null,"error":"server_response_missing_jwt","serverResponse":null}`.
+
+**Real theory checked and ruled out with direct evidence**: suspected
+a Clerk development-instance rate limit, given the exact same raw
+token value (`dvb_3GR3LBfko7B1Vhog01zYU4GCQWY`) reappeared across
+multiple attempts, and Clerk's own dashboard displays a real warning
+about strict usage limits on development instances. Checked Clerk's
+own dashboard directly (Users tab) - Maureen's account shows a real,
+successful sign-in recorded on 2026-08-23, during this exact testing
+window. Clerk genuinely processed and accepted her sign-in; a
+rate-limited request would not be recorded as a successful sign-in.
+This rules out Clerk-side rejection as the cause.
+
+**This narrows the real root cause precisely**: Clerk handed back a
+valid session, our own `/auth/token` server endpoint (hosted on
+Railway) received it, and returned a response with no `.jwt` field -
+`serverResponse: null` specifically, meaning our own server gave back
+nothing usable, not even an error object. The failure is confirmed to
+be on OUR side, not Clerk's.
+
+**Also retested the retry fix from section 20's earlier follow-up in
+this same session**: on a later attempt, the log showed `[LiveCollab]
+no Clerk session found after retries` - confirming the retry loop
+itself works exactly as designed (activates, retries, and correctly
+reports exhaustion when genuinely nothing is found), a separate,
+already-proven-working piece from the actual mint failure being
+investigated here.
+
+**Real, immediate next-session task, no waiting required**: check
+Railway's own server logs for the `/auth/token` endpoint directly,
+specifically around the timestamps of tonight's failed attempts, to
+see what our own backend actually did when it received Maureen's
+valid token and returned nothing. This is fully actionable
+immediately - nothing here depends on any rate-limit reset or delay,
+since Clerk-side rate limiting has been directly ruled out.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
