@@ -1035,6 +1035,39 @@ mistake this late. Confirmed only that `patient-joy` is the real,
 correct, currently-serving production project (verified by its real
 domain match) - the other five remain unexplained and unexamined.
 
+## 23. Local caching theory disproven with direct evidence - the token likely lives on Clerk's own servers, not Maureen's disk
+
+Tested section 22's real next-step directly: cleared Electron's actual
+cookie store (`Network`), `IndexedDB`, and `blob_storage` on Maureen's
+machine - the real locations, not the insufficient Local/Session
+Storage clear from section 20. Signed in fresh afterward.
+
+**Real, direct result: the exact same recurring token value
+(`dvb_3GR3LBfko7B1Vhog01zYU4GCQWY`) appeared again**, and produced the
+exact same `server_response_missing_jwt` failure - the same revoked
+token confirmed in section 22. This is a genuine, hard disproof of the
+"local caching" theory: every plausible local storage location we
+know of has now been cleared (Local Storage, Session Storage, Cookies,
+IndexedDB, blob_storage), and the identical value still came back.
+
+**Real, corrected theory**: this value is very likely not cached
+locally at all. It's more probably tied to an underlying Clerk
+session that is still active on Clerk's own servers - clearing local
+browser storage does nothing to that server-side state, so Clerk
+keeps handing back a token derived from the same still-live session
+regardless of what's cleared locally. A real, explicit sign-out
+(through the app's own logout flow, which calls our `/auth/logout`
+endpoint and genuinely revokes the session with Clerk) is a
+meaningfully different action from clearing local files, and hasn't
+been tried yet this session.
+
+**Real, concrete next-session task**: have Maureen use the app's own
+sign-out action (not force-quitting, not clearing files) before
+signing back in - this should trigger real, server-side Clerk session
+termination, which local storage clearing cannot do. If a genuinely
+new token appears after that, this theory is confirmed and the auth
+chain is finally unblocked.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
