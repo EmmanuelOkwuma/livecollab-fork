@@ -751,9 +751,15 @@
 			}
 			if (typeof window.Clerk === 'function') {
 				if (!_clerkInstance) { _clerkInstance = new window.Clerk(pk); }
-				_clerkInstance.load().then(function(){ applyUser(_clerkInstance.user); }).catch(function(){ if (done) done(); });
+				// Real, permanent diagnostic (2026-08-25): a real, confirmed
+				// successful sign-in on Maureen's machine still left the app
+				// stuck on the landing page - traced to this exact .load() call
+				// failing, its real error previously swallowed silently here,
+				// hiding the true cause. Logging it directly, same successful
+				// pattern as the earlier mint-token diagnostic fix.
+				_clerkInstance.load().then(function(){ applyUser(_clerkInstance.user); }).catch(function(e){ console.log('[LiveCollab] Clerk.load() failed:', e && (e.message || e)); if (done) done(); });
 			} else if (window.Clerk && typeof window.Clerk.load === 'function') {
-				window.Clerk.load().then(function(){ applyUser(window.Clerk.user); }).catch(function(){ if (done) done(); });
+				window.Clerk.load().then(function(){ applyUser(window.Clerk.user); }).catch(function(e){ console.log('[LiveCollab] Clerk.load() failed:', e && (e.message || e)); if (done) done(); });
 			} else if (window.Clerk && window.Clerk.user) {
 				applyUser(window.Clerk.user);
 			} else {
