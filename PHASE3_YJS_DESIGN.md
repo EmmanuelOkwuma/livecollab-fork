@@ -1068,6 +1068,48 @@ termination, which local storage clearing cannot do. If a genuinely
 new token appears after that, this theory is confirmed and the auth
 chain is finally unblocked.
 
+## 24. Real, different, earlier symptom found - the dashboard itself never leaves the landing screen after a confirmed successful Clerk sign-in
+
+Section 23 proposed testing an explicit in-app sign-out before signing
+back in. Discovered instead, directly from Maureen, a real, different,
+and earlier problem than anything traced so far tonight: on her
+machine, clicking Sign In genuinely completes on Clerk's side (real
+screenshot evidence: the browser tab shows Clerk's own "you're signed
+in, return to LiveCollab" confirmation, with a real, live callback URL
+firing on a local port), but returning to the LiveCollab app itself
+shows the exact same landing screen with Sign In / Sign Up buttons,
+as if nothing happened.
+
+**This is confirmed to be a genuinely different, earlier failure point
+than sections 20-23's investigation.** Everything traced so far
+(_boot()'s localStorage race, the retry fix, the mint-token diagnostic,
+the revoked-token discovery) all concerns what happens AFTER a
+successful sign-in, inside the workbench. This new symptom is upstream
+of all of that - the dashboard itself isn't transitioning past its own
+landing screen following a real, Clerk-confirmed successful sign-in.
+
+**Not yet established**: whether this is a permanent stuck state or a
+timing issue that eventually resolves - this specific question was
+asked directly but not answered before the session closed. Real,
+necessary first question for next session, before any other
+diagnosis: does the landing screen stay stuck indefinitely, or does it
+eventually proceed on its own after some delay?
+
+**Honest process note**: this session ran very long, across multiple
+real days of continuous work, and real confusion and frustration
+surfaced repeatedly in the final stretch - including me proposing an
+in-app sign-out action without first confirming Maureen could
+actually reach the dashboard to use it, which was a real, avoidable
+mistake given what had already been described. Stopping here
+deliberately rather than pushing through further while worn down.
+
+**Real, next-session starting point**: get a direct, clear answer to
+whether the landing screen resolves on its own or requires a specific
+action, then trace this new symptom with the same real, verified,
+step-by-step discipline used successfully earlier this session (the
+token-refresh fix, the diagnostic-visibility fix, the database
+confirmation) rather than guessing further.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
