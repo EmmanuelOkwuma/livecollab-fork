@@ -265,8 +265,17 @@ class LiveCollabStartupOwner extends Disposable implements IWorkbenchContributio
 				}
 			}
 			if (!dvbJwt) { console.log('[LiveCollab] no Clerk session found after retries'); return; }
-			const clerkJwt = await ipc.invoke('vscode:livecollab-mint-token', dvbJwt) as string | null;
-			if (!clerkJwt) { console.log('[LiveCollab] could not mint Clerk token'); return; }
+			// Real, permanent fix (2026-08-23): the main-process handler now
+			// returns the actual failure reason instead of a bare null, so it's
+			// visible right here in the renderer console - reliably reachable via
+			// DevTools export - instead of only in the main-process terminal,
+			// which proved unreliable to access during real debugging tonight.
+			const mintResult = await ipc.invoke('vscode:livecollab-mint-token', dvbJwt) as { jwt: string | null; error?: string; serverResponse?: unknown; message?: string } | null;
+			if (!mintResult || !mintResult.jwt) {
+				console.log('[LiveCollab] could not mint Clerk token - reason:', mintResult?.error, JSON.stringify(mintResult));
+				return;
+			}
+			const clerkJwt = mintResult.jwt;
 			const displayName = (window as any)._dashDisplayName || (window as any)._dashFullName || 'User';
 			livecollabService.setToken(clerkJwt);
 			(livecollabService as any)._displayName = displayName;

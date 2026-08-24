@@ -881,12 +881,19 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 				electron.ipcMain.removeHandler('vscode:livecollab-mint-token');
 				electron.ipcMain.handle('vscode:livecollab-mint-token', async (_event, dbjwt: string) => {
 					// Ask our server to mint the Clerk session JWT. Secret stays server-side.
+					// Real, permanent fix: the [MINT-DIAG] logs below only ever reach the
+					// main-process terminal, which proved unreliable to access remotely
+					// during real debugging (2026-08-23). Now ALSO returns the real
+					// failure reason in the response itself, so the renderer - whose
+					// console IS reliably reachable via DevTools export - can log it
+					// directly. No more failure mode is invisible without terminal access.
 					try {
-						if (!dbjwt) { console.log('[MINT-DIAG] no dbjwt provided'); return null; }
+						if (!dbjwt) { console.log('[MINT-DIAG] no dbjwt provided'); return { jwt: null, error: 'no_dbjwt_provided' }; }
 						const out = await lcServerPost('/auth/token', dbjwt);
 						console.log('[MINT-DIAG] server response:', JSON.stringify(out));
-						return (out && out.jwt) ? out.jwt : null;
-					} catch (e) { console.log('[MINT-DIAG] exception:', e); return null; }
+						if (out && out.jwt) { return { jwt: out.jwt }; }
+						return { jwt: null, error: 'server_response_missing_jwt', serverResponse: out };
+					} catch (e) { console.log('[MINT-DIAG] exception:', e); return { jwt: null, error: 'exception', message: String(e) }; }
 				});
 				electron.ipcMain.removeHandler('vscode:livecollab-check-session');
 				electron.ipcMain.handle('vscode:livecollab-check-session', async (_event, dbjwt: string) => {
