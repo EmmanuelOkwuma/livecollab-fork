@@ -717,51 +717,39 @@
 	var _clerkInstance = null;
 	function resolveClerkUser(sessionUrl, done) {
 		try {
-			var pk = 'pk_test_Zml0dGluZy1tYWtvLTQ0LmNsZXJrLmFjY291bnRzLmRldiQ';
-			// Pull dev-browser token from the callback so Clerk JS adopts the same session
+			// Pull dev-browser token from the callback
 			var dbjwt = '';
 			try { dbjwt = new URL(sessionUrl).searchParams.get('__clerk_db_jwt') || ''; } catch (e) {}
 			if (dbjwt) { try { localStorage.setItem('__clerk_db_jwt', dbjwt); } catch (e) {} }
-			if (typeof window.Clerk === 'undefined') {
-				// Clerk JS may be a constructor or a global instance depending on build
-				if (window.Clerk === undefined && typeof Clerk !== 'undefined') { window.Clerk = Clerk; }
-			}
-			function applyUser(user) {
-				if (user) {
-					var fn = (user.fullName || ((user.firstName||'') + ' ' + (user.lastName||'')).trim());
-					var em = '';
-					if (user.primaryEmailAddress && user.primaryEmailAddress.emailAddress) { em = user.primaryEmailAddress.emailAddress; }
-					else if (user.emailAddresses && user.emailAddresses.length) { em = user.emailAddresses[0].emailAddress; }
-					var prov = '';
-					if (user.externalAccounts && user.externalAccounts.length) {
-						var p = (user.externalAccounts[0].provider || '').replace('oauth_','');
-						prov = p ? p.charAt(0).toUpperCase()+p.slice(1) : '';
-					}
-					window._dashFullName = fn || '';
-					if (!window._dashDisplayName && fn) window._dashDisplayName = fn.split(' ')[0]; // fallback: this path can't reach the server's stored display name, use first name instead of full name
-					window._dashEmail = em || '';
-					window._dashProvider = prov || '';
-					window._dashUserId = user.id || '';
-					window._dashOnboarded = !!(user.publicMetadata && user.publicMetadata.onboarded);
+			// Real fix (PHASE3_YJS_DESIGN.md section 25): Clerk's client-side SDK
+			// requires setting a __session cookie on the app's own domain via
+			// document.cookie - confirmed via Clerk's own documentation. This
+			// app's dashboard runs under vscode-file://, a custom protocol that
+			// does not support cookies, so Clerk.load() always resolved user and
+			// session as null, confirmed via a real live test with a precise
+			// diagnostic. Real fix: bypass Clerk's client-side SDK entirely and
+			// call this app's own, already-working, server-verified
+			// vscode:livecollab-check-session endpoint directly - the same real
+			// IPC pattern already proven successful for token minting, which
+			// needs no browser cookies since it's a pure server-to-server call.
+			function applyServerSession(s) {
+				if (s && s.userId) {
+					window._dashFullName = s.fullName || '';
+					window._dashDisplayName = s.displayName || (s.fullName ? s.fullName.split(' ')[0] : '');
+					window._dashEmail = s.email || '';
+					window._dashProvider = s.provider || '';
+					window._dashUserId = s.userId || '';
+					window._dashOnboarded = !!s.onboarded;
 					try { window.dispatchEvent(new CustomEvent('livecollab:identity-ready')); } catch(e) {}
 					var dni = document.getElementById('display-name-input');
-					if (dni && !dni.value && fn) { dni.value = fn.split(' ')[0]; }
+					if (dni && !dni.value && s.fullName) { dni.value = s.fullName.split(' ')[0]; }
 				}
 				if (done) done();
 			}
-			if (typeof window.Clerk === 'function') {
-				if (!_clerkInstance) { _clerkInstance = new window.Clerk(pk); }
-				// Real, permanent diagnostic (2026-08-25): a real, confirmed
-				// successful sign-in on Maureen's machine still left the app
-				// stuck on the landing page - traced to this exact .load() call
-				// failing, its real error previously swallowed silently here,
-				// hiding the true cause. Logging it directly, same successful
-				// pattern as the earlier mint-token diagnostic fix.
-				_clerkInstance.load().then(function(){ console.log('[LiveCollab] Clerk.load() resolved, user:', _clerkInstance.user, 'session:', _clerkInstance.session); applyUser(_clerkInstance.user); }).catch(function(e){ console.log('[LiveCollab] Clerk.load() failed:', e && (e.message || e)); if (done) done(); });
-			} else if (window.Clerk && typeof window.Clerk.load === 'function') {
-				window.Clerk.load().then(function(){ console.log('[LiveCollab] Clerk.load() resolved, user:', window.Clerk.user, 'session:', window.Clerk.session); applyUser(window.Clerk.user); }).catch(function(e){ console.log('[LiveCollab] Clerk.load() failed:', e && (e.message || e)); if (done) done(); });
-			} else if (window.Clerk && window.Clerk.user) {
-				applyUser(window.Clerk.user);
+			if (dbjwt && window.vscode && window.vscode.ipcRenderer) {
+				window.vscode.ipcRenderer.invoke('vscode:livecollab-check-session', dbjwt)
+					.then(function(s){ console.log('[LiveCollab] server session check:', s); applyServerSession(s); })
+					.catch(function(e){ console.log('[LiveCollab] server session check failed:', e && (e.message || e)); if (done) done(); });
 			} else {
 				if (done) done();
 			}
