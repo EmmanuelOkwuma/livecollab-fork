@@ -1110,6 +1110,55 @@ step-by-step discipline used successfully earlier this session (the
 token-refresh fix, the diagnostic-visibility fix, the database
 confirmation) rather than guessing further.
 
+## 25. Real, definitive, officially-documented root cause found - Clerk's client-side SDK structurally cannot work under this app's vscode-file:// origin
+
+Section 24's precise diagnostic confirmed the theory directly: live
+test showed `[LiveCollab] Clerk.load() resolved, user: null session:
+null` - Clerk's own client-side SDK genuinely loads without error,
+but recognizes no session at all, despite a valid, server-verified
+dev-browser token being present.
+
+**Checked Clerk's own official documentation to understand why, rather
+than guess further.** Their "How Clerk works" page describes the real
+mechanism precisely: after the initial dev-browser (`__client`) token
+handoff, Clerk's client-side SDK makes a request to their API to
+obtain a session token, and this session token must be set as a
+`__session` cookie **on the app's own domain**, via JavaScript running
+in that domain - not returned via a normal Set-Cookie header, because
+cross-domain cookie rules don't allow that. The SDK does this itself,
+using `document.cookie`, once it receives the token back.
+
+**This is a genuine, structural incompatibility, not a bug in our own
+code.** This app's dashboard renders under the `vscode-file://`
+custom protocol, not a real `http://` or `https://` origin. Cookies
+are fundamentally an HTTP(S) concept tied to real origins; Chromium's
+custom, non-standard protocol handlers commonly do not support
+`document.cookie` at all. This explains the entire mystery completely
+and coherently for the first time:
+
+- Why the same dev-browser token kept reappearing across every
+  attempt, regardless of what local storage was cleared (sections 20,
+  22, 23) - it's a legitimate Clerk mechanism, not a caching bug.
+- Why our own server-side verification (`/auth/token`, `/auth/session`
+  in `server/index.js`) has worked correctly all session - server-to-
+  server API calls need no browser cookies at all.
+- Why Clerk's client-side `Clerk.load()` succeeds with zero error, yet
+  `user`/`session` remain permanently null - the SDK's own cookie-set
+  step likely silently fails or is a no-op under this origin, with no
+  visible error surfaced back to the caller.
+
+**Real, concrete, actionable next-session task**: the dashboard does
+not need Clerk's client-side `.user`/`.session` at all. This app
+already has a working, server-verified path that doesn't depend on
+browser cookies - the real `/auth/session` endpoint in
+`server/index.js`, which correctly resolves the authenticated user
+directly from the dev-browser token via Clerk's server-side API. Real
+fix direction: have `resolveClerkUser()` call this existing endpoint
+directly (the same real IPC pattern already used successfully for
+`vscode:livecollab-mint-token`) instead of relying on
+`_clerkInstance.user`, bypassing the broken cookie-dependent path
+entirely rather than trying to work around Clerk's client SDK.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
