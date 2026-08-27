@@ -1159,6 +1159,57 @@ directly (the same real IPC pattern already used successfully for
 `_clerkInstance.user`, bypassing the broken cookie-dependent path
 entirely rather than trying to work around Clerk's client SDK.
 
+## 26. Real, confirmed breakthrough - the landing-page-stuck bug is genuinely resolved, live-verified with real evidence. Session close-out.
+
+Cleared Maureen's one confirmed-revoked, stale test token from the
+live production database (a targeted, single-row delete inside the
+real container via `railway ssh`, verified before and after: row
+existed, exactly one row deleted, row confirmed gone) - unblocking a
+real test of section 25's structural fix.
+
+**Confirmed, live, definitive success, verified twice.** First,
+Maureen's dashboard console showed a real, fully-populated session
+object from our own server (`userId`, `email`, `fullName`, `provider`,
+`onboarded: true`). Second and more conclusively: after a full force-
+quit and clean relaunch, the app went straight to the dashboard with
+no landing screen and no sign-in step at all. This is genuine,
+end-to-end, live proof that bypassing Clerk's cookie-dependent client
+SDK and calling this app's own server-verified session endpoint
+directly works completely correctly. The entire dashboard-stuck-on-
+landing-page bug, precisely traced and diagnosed across sections
+24-25 using Clerk's own official documentation, is confirmed resolved
+with real evidence, not merely assumed fixed from a clean compile.
+
+**Real, new, separate problem found and traced to its exact source
+before closing out**: `[LiveCollab] dashboard socket error:
+unauthorized`. Traced to `server/index.js`'s `io.use()` Socket.io
+middleware: `if (!token) return next(new Error("unauthorized"))`. The
+client mints a token fresh on every connection attempt via the same
+`vscode:livecollab-mint-token` IPC path already diagnosed earlier this
+session. Not yet determined whether this is a token-minting timing
+issue similar to ones already fixed elsewhere, or something else -
+genuinely open, not yet root-caused.
+
+**Real, deliberate scope decision**: per the explicit plan to test
+first and only investigate the recurring-token question if it
+resurfaces, that question was not re-opened tonight, since testing
+(successfully) took priority.
+
+**Real, practical next-session plan, recorded plainly**: a second
+physical test machine (a 2017 iMac, macOS Ventura 13.7 - confirmed
+compatible: sufficient for an Electron app) is being set up as a
+permanent second tester, reducing reliance on Maureen's availability.
+The LiveCollab build should be installed on it before moving to Rowan
+tomorrow (2026-08-27), so it's ready to use immediately after moving
+in, ahead of the 2026-08-28 YC decision. Real next-session sequence:
+confirm the socket-auth issue just found, then run the actual Phase 3
+concurrent-editing test using the iMac and MacBook as the two real
+machines.
+
+**Real, confirmed final state for this session**: commit
+`7c7dc6ddb47`, pushed, local matches remote, working tree clean -
+nothing uncommitted, nothing mid-change.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
