@@ -872,11 +872,11 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 						}, (resp) => {
 							let d = '';
 							resp.on('data', (c) => d += c);
-							resp.on('end', () => { console.log('[SERVERPOST-DIAG] path:', path, 'statusCode:', resp.statusCode, 'raw body:', d); try { resolve(JSON.parse(d)); } catch (e) { console.log('[SERVERPOST-DIAG] JSON parse failed:', e); resolve(null); } });
+							resp.on('end', () => { try { resolve(JSON.parse(d)); } catch (e) { resolve(null); } });
 						});
-						r.on('error', (e) => { console.log('[SERVERPOST-DIAG] network error:', e); resolve(null); });
+						r.on('error', (e) => { resolve(null); });
 						r.write(payload); r.end();
-					} catch (e) { console.log('[SERVERPOST-DIAG] outer exception:', e); resolve(null); }
+					} catch (e) { resolve(null); }
 				}); }
 				electron.ipcMain.removeHandler('vscode:livecollab-mint-token');
 				electron.ipcMain.handle('vscode:livecollab-mint-token', async (_event, dbjwt: string) => {

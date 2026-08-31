@@ -75,16 +75,10 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 			// ACTUAL, CURRENT folder list at this exact moment (not the
 			// earlier-computed realFolderIndex/realFolder, which could be
 			// stale by now) so the before/after picture is real, not assumed.
-			const foldersBefore = this.workspaceContextService.getWorkspace().folders;
-			console.log('[FOLDER-CLEANUP-DIAG] BEFORE removal, full folder list:', foldersBefore.map(f => ({ uri: f.uri.toString(), scheme: f.uri.scheme, name: f.name })));
 			if (realFolderIndex !== -1) {
 				console.log('[LiveCollab] room left - removing attached real folder');
 				this.workspaceEditingService.updateFolders(realFolderIndex, 1);
-			} else {
-				console.log('[FOLDER-CLEANUP-DIAG] realFolderIndex was -1, no removal attempted');
 			}
-			const foldersAfter = this.workspaceContextService.getWorkspace().folders;
-			console.log('[FOLDER-CLEANUP-DIAG] AFTER removal, full folder list:', foldersAfter.map(f => ({ uri: f.uri.toString(), scheme: f.uri.scheme, name: f.name })));
 			// PHASE3_YJS_DESIGN.md sections 16-18: real root cause of stale room
 			// folders accumulating across sessions - updateFolders() above only
 			// edits the LIVE, in-memory workspace, it never touches the separate,
@@ -173,13 +167,10 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 			// whether this exact path is somehow running more than once
 			// (meaning the static analysis above is wrong somewhere) or whether
 			// the duplicates come from a different, not-yet-found code path.
-			console.log('[FOLDER-DUP-DIAG] onFileTree folder-add check, uri:', uri.toString(), 'roomName:', roomName, '_virtualFolderAdded was:', _virtualFolderAdded, 'at', Date.now());
 			if (!_virtualFolderAdded) {
 				_virtualFolderAdded = true;
-				console.log('[FOLDER-DUP-DIAG] ADDING folder now, uri:', uri.toString());
 				await this.workspaceEditingService.updateFolders(0, 0, [{ uri, name: roomName }]);
 			} else {
-				console.log('[FOLDER-DUP-DIAG] SKIPPED - flag already true');
 			}
 		}));
 
