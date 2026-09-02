@@ -1235,7 +1235,16 @@
 				let tok = '';
 				try { tok = localStorage.getItem('__clerk_db_jwt') || ''; } catch(e) {}
 				if (!tok || !window.vscode || !window.vscode.ipcRenderer) return null;
-				return await window.vscode.ipcRenderer.invoke('vscode:livecollab-mint-token', tok);
+				// Real fix (2026-09-02): vscode:livecollab-mint-token now returns
+				// { jwt, error, serverResponse } instead of a raw string, changed
+				// earlier this session to make mint failures visible. This caller
+				// was missed at the time and was still treating the whole object
+				// as the token itself, sending [object Object] to the server and
+				// causing every dashboard socket connection to fail as
+				// unauthorized. Extract the real jwt field.
+				const result = await window.vscode.ipcRenderer.invoke('vscode:livecollab-mint-token', tok);
+				if (!result || !result.jwt) { console.log('[LiveCollab] dashboard mint failed:', result); return null; }
+				return result.jwt;
 			} catch(e) { return null; }
 		}
 
