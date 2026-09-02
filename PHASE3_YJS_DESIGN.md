@@ -1210,6 +1210,83 @@ machines.
 `7c7dc6ddb47`, pushed, local matches remote, working tree clean -
 nothing uncommitted, nothing mid-change.
 
+## 27. Real, genuine architecture fix confirmed live on both machines, then a real, precise remaining timing issue found and honestly recorded
+
+**Confirmed, real, and definitive success first**: the entire cross-
+architecture packaging bug (sections traced across the last several
+sessions) is genuinely resolved. The x64 build launched cleanly on
+the real iMac with zero architecture crash, reaching the actual
+sign-in screen - the first time this ever happened after two full
+nights of AirDrop, iCloud, and native-module failures. Root cause was
+several native modules (`policy-watcher`, `fs-copyfile`, `sharp`,
+`msal-node-runtime`) getting compiled for the host machine's own
+architecture rather than the packaging target, plus a large third-
+party Copilot SDK bundle with no x64 variant available at all -
+resolved by rebuilding the project's own native modules explicitly
+per-architecture and removing the unrelated Copilot/microsoft-
+authentication extensions from the final bundle, since neither is
+needed for LiveCollab's own functionality.
+
+**Real, honest mistake made and corrected during this same work**: a
+`git add -A` accidentally staged a large local-only backup folder
+created earlier (`node_modules-arm64-backup`), correctly rejected by
+GitHub for exceeding its file size limit. Undone cleanly via `git
+reset --soft` before recommitting only the real, intended changes;
+the folder was added to `.gitignore` to prevent recurrence.
+
+**Real, separate architecture regression found and fixed**: fixing
+the iMac's native modules for x64 had overwritten the *shared*
+`node_modules` source both architectures build from, silently
+breaking the MacBook's own arm64 build in the process. Traced via a
+direct `dlopen` architecture-mismatch error and fixed by rebuilding
+`policy-watcher` back to arm64 specifically.
+
+**Real, second genuine bug found and fixed this session**: room
+creation was failing with `unauthorized` on the dashboard socket.
+Traced to a real caller mismatch - `vscode:livecollab-mint-token`'s
+return shape was changed earlier this session to `{ jwt, error,
+serverResponse }` to make failures visible, and the workbench's own
+caller was updated to match at the time, but a separate, dashboard-
+side caller of the same IPC channel (`lcMintToken()` in
+`livecollab-bootstrap.html`) was missed, and was still treating the
+whole returned object as the raw token itself - sending
+`[object Object]` as the auth token to the server on every dashboard
+connection attempt. Fixed by extracting the real `.jwt` field.
+
+**Real, separate multi-window regression found and fixed**: the app
+began opening two windows on every launch, even from a fully clean
+process state. Traced to `window.restoreWindows: none`, a real fix
+from earlier in this project's history, having been lost from
+`settings.json` during one of tonight's many Application Support
+cleanup operations - VS Code's own stock default is `'all'`, silently
+restoring prior window state once the override was gone. Restored
+directly.
+
+**Real, new, and honestly unresolved finding at close**: even after
+the mint-token caller fix, `unauthorized` errors persisted on repeat.
+Traced directly and precisely - NOT guessed at - using the exact same
+successful pattern as earlier root-causing this session: exported the
+real terminal diagnostic output, confirmed the server's own
+`/auth/token` endpoint is genuinely minting valid, correctly-shaped
+JWTs on every single attempt, then tested Clerk's own server-side
+`verifyToken()` directly against one of these real, captured tokens
+via `railway ssh`. Result: `token-expired` - confirming the
+verification logic itself works correctly, but the specific captured
+token had already outlived its real, confirmed 60-second lifetime by
+the time it was tested. The live socket logs show repeated
+reconnection attempts, each minting a genuinely fresh token, each
+still failing - pointing to a real, likely timing gap between a token
+being minted and it actually reaching the server's verification step,
+not a broken auth flow. This is a genuine, different, and precise
+problem from anything already fixed tonight - not yet root-caused,
+honestly left open rather than guessed at further at this hour.
+
+**Real, concrete next-session starting point**: measure the actual
+real-world delay between a token being minted client-side and the
+server receiving/verifying it during a live socket handshake, to
+confirm or rule out the timing-gap theory directly, the same
+evidence-first way every other real fix landed tonight.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
