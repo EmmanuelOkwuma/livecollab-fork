@@ -187,8 +187,18 @@ export class LiveCollabService extends Disposable {
 			if (!ipc) { return this._token; }
 			const dvbJwt = (() => { try { return localStorage.getItem('__clerk_db_jwt') || ''; } catch { return ''; } })();
 			if (!dvbJwt) { return this._token; }
-			const fresh = await ipc.invoke('vscode:livecollab-mint-token', dvbJwt) as string | null;
-			if (fresh) { this._token = fresh; return fresh; }
+			// Real fix (2026-09-02, PHASE3_YJS_DESIGN.md section 27): the
+			// same caller-mismatch bug already fixed for the dashboard's
+			// lcMintToken() this session, found here in a third, separate
+			// caller. vscode:livecollab-mint-token returns { jwt, error,
+			// serverResponse }, not a raw string - this was still treating
+			// the whole object as the token itself, sending an invalid,
+			// non-string auth value to the socket on every reconnect and
+			// refresh, confirmed live via the real "token.split is not a
+			// function" server-side error. Extract the real jwt field.
+			const result = await ipc.invoke('vscode:livecollab-mint-token', dvbJwt) as { jwt: string | null; error?: string } | null;
+			if (result && result.jwt) { this._token = result.jwt; return result.jwt; }
+			if (result && result.error) { console.log('[LiveCollab] workbench refreshToken mint failed:', result.error); }
 			return this._token;
 		} catch { return this._token; }
 	}

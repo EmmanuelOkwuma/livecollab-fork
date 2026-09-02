@@ -1240,7 +1240,10 @@
 				let tok = '';
 				try { tok = localStorage.getItem('__clerk_db_jwt') || ''; } catch(e) {}
 				if (!tok || !window.vscode || !window.vscode.ipcRenderer) return null;
-				return await window.vscode.ipcRenderer.invoke('vscode:livecollab-mint-token', tok);
+				// Same real fix as livecollab-bootstrap.html (2026-09-02, PHASE3_YJS_DESIGN.md section 27)
+				const result = await window.vscode.ipcRenderer.invoke('vscode:livecollab-mint-token', tok);
+				if (!result || !result.jwt) { console.log('[LiveCollab] dashboard mint failed:', result); return null; }
+				return result.jwt;
 			} catch(e) { return null; }
 		}
 
