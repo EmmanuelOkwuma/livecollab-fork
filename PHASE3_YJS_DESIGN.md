@@ -1287,6 +1287,66 @@ server receiving/verifying it during a live socket handshake, to
 confirm or rule out the timing-gap theory directly, the same
 evidence-first way every other real fix landed tonight.
 
+## 28. Real, first-ever Phase 3 concurrent-editing test run - room creation confirmed fixed, but the actual CRDT sync goal not yet working
+
+**Confirmed, real success first**: the room-creation bug (section 27)
+is genuinely, completely fixed and committed (`7926a37a4af`) - a
+stale `jwt` fallback in the dashboard socket's auth callback,
+confirmed live via the server's own timing diagnostic showing a
+token over two hours old being sent on a connection attempt. Fixed
+by always using the fresh mint result. Room creation and joining now
+work reliably on both the MacBook and the iMac, using two real,
+separate accounts.
+
+**The actual Phase 3 test was run for the first time this session**:
+two people, two real physical machines, same room, typing in
+different spots of the same file at roughly the same time. Real
+result, reported directly and clearly: **edits overwrite rather than
+merge**. Typing a character on the MacBook while a different
+character was typed on the iMac resulted in each machine showing
+only the OTHER machine's character - not both. This is the opposite
+of what CRDT-based concurrent editing is supposed to do.
+
+**Checked directly, not guessed at**: searched all three logs
+captured during the actual test (workbench console, iMac console,
+iMac console take two) for any Yjs/CRDT-related activity - genuinely
+found none. No `code:change`, no `yjs`, no `crdt` logging appears
+anywhere across any of the three captures during the real test
+window. This is real, if incomplete, evidence that the CRDT sync
+layer - built out extensively in this project's earlier history per
+this same design doc - is not actually the mechanism handling edits
+right now. The observed overwrite-not-merge behavior is consistent
+with the simpler, older Socket.io-based sync running instead, which
+is last-write-wins by design, not with Yjs, which should merge.
+
+**Real, separate, second observation from the same test session**:
+files created with real extensions (`.py`, `.js`) showed as plain
+text in the status bar, with no language icon or syntax highlighting.
+Possibly connected to the iMac's own extension host crash-loop
+(sections logged separately, still unresolved) - language detection
+and icons are typically populated via extension contributions, which
+never successfully activate if the extension host never starts
+cleanly. Not confirmed as the same root cause, genuinely two separate
+open questions.
+
+**Honest assessment**: tonight's real, hard-won infrastructure work -
+the architecture fix, the four-caller mint-token bug, the stale-jwt
+fallback - was all necessary and is genuinely done. But the actual
+Phase 3 goal itself, real-time collaborative editing where both
+people's edits survive together, has now been tested for the first
+time and does not yet work as intended. This is not a small or
+cosmetic gap - it's the core feature the entire project chain of
+fixes was in service of, and it remains open.
+
+**Real, concrete next-session starting point**: confirm directly
+whether the Yjs/y-monaco integration is genuinely wired into the live
+edit path at all right now, or whether edits are flowing exclusively
+through the older Socket.io `code:change` mechanism - check the real,
+current call sites in `livecollabEditorContribution.ts` and
+`livecollabService.ts` directly, the same evidence-first way
+everything else got traced tonight, before assuming either
+possibility.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
