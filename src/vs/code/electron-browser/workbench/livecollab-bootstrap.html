@@ -1256,7 +1256,16 @@
 				const jwt = await lcMintToken();
 				if (!jwt) { lcConnecting = false; console.warn('[LiveCollab] no token to connect dashboard socket'); return null; }
 				lcSocket = io(SERVER_URL, {
-						auth: function(cb){ lcMintToken().then(function(t){ cb({ token: t || jwt || '' }); }).catch(function(){ cb({ token: jwt || '' }); }); },
+						// Real fix (2026-09-02, PHASE3_YJS_DESIGN.md section 27):
+						// the outer jwt var here was captured once, when lcConnect()
+						// first ran, and could go stale for hours in a long-running
+						// session. Falling back to it on any mint failure meant a
+						// genuinely ancient token could get sent, confirmed live via
+						// the server's own timing diagnostic showing a token over
+						// two hours past its 60-second lifetime. Always use the
+						// fresh mint result now - an honest empty token on failure
+						// is better than a silent, confusing stale one.
+						auth: function(cb){ lcMintToken().then(function(t){ cb({ token: t || '' }); }).catch(function(){ cb({ token: '' }); }); },
 						transports: ['websocket'],
 						reconnection: true
 					});
