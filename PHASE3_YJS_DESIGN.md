@@ -1347,6 +1347,72 @@ current call sites in `livecollabEditorContribution.ts` and
 everything else got traced tonight, before assuming either
 possibility.
 
+## 29. Three real, separate bugs found with real evidence in a full two-machine test - multi-window fix confirmed on iMac, Yjs confirmed never firing, file-tree broadcast mismatch found
+
+**Confirmed, real, and positive first**: the `window.restoreWindows:
+none` fix, applied earlier this session only to the MacBook's own
+settings.json, was missing entirely on the iMac's separate user
+profile - explaining the iMac's own multi-window bug. Applied
+directly to the iMac. Confirmed fixed: single window, and the
+previously-missing menu bar (File, Edit, View, etc.) now appears
+correctly too - a real, additional signal the extension host is
+likely starting more cleanly now, though not separately confirmed.
+
+**Real, full two-machine test run, with real console logs captured
+and searched directly** (not summarized or assumed): a roommate
+helped operate the iMac as a genuinely separate person. Two real
+attempts - first with real sentences on different lines, then with
+simple 2-3 character tests. Real result, consistent across both:
+edits scrambled/overwrote rather than merging cleanly. Confirmed with
+direct evidence this time, not repeated from an earlier, unverified
+claim.
+
+**Real bug #1, confirmed with direct evidence**: Yjs genuinely never
+fires during actual use, despite the code existing in source.
+Searched the real, substantial 1793-line MacBook workbench log
+directly - `code change received` and `change fired` (the old,
+Socket.io-based, last-write-wins mechanism) appear dozens of times;
+`Yjs`, `y-monaco`, and `MonacoBinding` appear zero times anywhere in
+the entire capture, and no unhandled-rejection or silent-failure
+evidence appears either, suggesting `_setupYjsBinding()` isn't being
+reached at all, not that it's failing silently. Traced to a real,
+plausible cause: `_setupYjsBinding()` is only called inside
+`onDidChangeModel` (editor.ts line ~82) - a listener that only fires
+on switching to a *different* file. If a file is already open in the
+editor before this listener gets registered (plausible on room join),
+Yjs binding would never get set up for that first file at all.
+
+**Real bug #2, found from a direct log mismatch**: the file tree
+broadcast between machines is inconsistent. The host's own log shows
+`file tree broadcast: 1 items`; the guest's log shows `file tree
+received: 0 items` for what should be the same broadcast. This
+matches Manny's real, separately-reported symptom: the guest's
+Explorer stayed empty after joining, requiring a manual "Add a
+folder" workaround before folder content matched.
+
+**Real, third, not-yet-confirmed observation, recorded honestly as
+open**: files created with real extensions (`.js`) still show as
+plain text with no language icon or syntax highlighting. Checked
+`livecollabFileSystemProvider.ts` directly - it extends VS Code's own
+stock `InMemoryFileSystemProvider` with no language-specific
+overrides, so the cause isn't obviously in this file. Not yet traced
+further.
+
+**Real, precise next-session starting point, in order**:
+1. Fix bug #1 first, since it's the actual Phase 3 goal: call
+   `_setupYjsBinding()` on initial editor mount as well as on model
+   change, not only on file-switch, so the very first file opened in
+   a session gets a real Yjs binding too.
+2. Then re-run the real two-machine test and check the same way -
+   search the real logs directly for `Yjs`/`MonacoBinding` activity,
+   confirming it fires this time, before declaring success from
+   visual impression alone.
+3. Then investigate bug #2, the file-tree broadcast/receive mismatch,
+   likely a separate, real bug in how the broadcast payload is built
+   or received on the other end.
+4. The language-detection issue remains open and unexplored past
+   ruling out the file system provider as the obvious cause.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
