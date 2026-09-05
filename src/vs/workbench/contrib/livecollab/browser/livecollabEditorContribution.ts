@@ -51,6 +51,17 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 	) {
 		super();
 
+		// Real fix (PHASE3_YJS_DESIGN.md section 29): _setupYjsBinding()
+		// was previously only called inside onDidChangeModel, which only
+		// fires when switching to a DIFFERENT file. A file already open
+		// in the editor when this contribution is constructed - the
+		// common case on room join - never got a Yjs binding at all,
+		// confirmed with real evidence: the old code:change path fired
+		// dozens of times in a live two-machine test while Yjs/y-monaco/
+		// MonacoBinding never appeared anywhere in the captured logs.
+		// Call it here too so the very first file gets bound as well.
+		this._setupYjsBinding();
+
 		// Emit code changes to socket when user types
 		this._register(this.editor.onDidChangeModelContent(() => {
 			console.log("[LiveCollab] change fired, connected:", livecollabService.isConnected, "roomId:", livecollabService.roomId);
@@ -163,8 +174,18 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 	// CURRENT model before committing the binding, so an older, slower-
 	// resolving call can never overwrite a newer one with a stale binding.
 	private async _setupYjsBinding(): Promise<void> {
+		// Real, precise diagnostic (PHASE3_YJS_DESIGN.md section 29
+		// follow-up): this function had zero logging of its own, so a
+		// live two-machine test showing no Yjs-related console activity
+		// was genuinely ambiguous - could mean this never gets called,
+		// or it runs completely silently either way. Also called
+		// without await/catch at its call sites, so any real thrown
+		// error here would become a silent unhandled rejection. Logging
+		// entry, progress, and any real failure removes the ambiguity
+		// with real evidence instead of guessing further.
+		console.log('[LiveCollab] _setupYjsBinding called');
 		const modelAtStart = this.editor.getModel();
-		if (!modelAtStart) { return; }
+		if (!modelAtStart) { console.log('[LiveCollab] _setupYjsBinding: no model, aborting'); return; }
 		const fileId = modelAtStart.uri.path.split('/').pop() || modelAtStart.uri.path;
 		// Captured synchronously, before any await, so this reflects whatever
 		// real content is ALREADY in the model right now (see
@@ -176,15 +197,22 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 		// never at risk of being re-seeded.
 		const currentContent = modelAtStart.getValue();
 
+		try {
 		const doc = await livecollabService.getOrCreateYjsDoc(fileId, currentContent);
+		console.log('[LiveCollab] _setupYjsBinding: got Y.Doc for fileId:', fileId);
 		const MonacoBindingClass = await livecollabService.getMonacoBindingClass();
+		console.log('[LiveCollab] _setupYjsBinding: got MonacoBinding class:', !!MonacoBindingClass);
 
 		const modelNow = this.editor.getModel();
-		if (!modelNow || modelNow !== modelAtStart) { return; } // stale - user switched files again while we were loading
+		if (!modelNow || modelNow !== modelAtStart) { console.log('[LiveCollab] _setupYjsBinding: stale, model changed while loading'); return; } // stale - user switched files again while we were loading
 
 		this._yjsBinding?.destroy();
 		const ytext = doc.getText('content');
 		this._yjsBinding = new MonacoBindingClass(ytext, modelNow, new Set([this.editor]));
+		console.log('[LiveCollab] _setupYjsBinding: binding created successfully for fileId:', fileId);
+		} catch (e) {
+			console.log('[LiveCollab] _setupYjsBinding: real error:', e);
+		}
 	}
 }
 
