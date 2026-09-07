@@ -1413,6 +1413,83 @@ further.
 4. The language-detection issue remains open and unexplored past
    ruling out the file system provider as the obvious cause.
 
+## 30. Real bugs found and fixed, then a real architectural mismatch discovered - design decision needed before further code changes
+
+**Real bugs found and fixed this session, in order:**
+
+1. **fileId was filename-only, not full-path.** `model.uri.path.split('/').pop()`
+   discarded the folder path entirely, meaning two files with the same name
+   in different folders shared one sync identity. Fixed at all five real
+   occurrences in `livecollabEditorContribution.ts` to use `model.uri.path`
+   directly.
+
+2. **The server had no `yjs:update` listener at all.** Confirmed with a
+   direct grep returning nothing. Both clients were correctly emitting
+   `yjs:update` on every keystroke - confirmed live via diagnostic logging -
+   but the server had zero code to relay it, so every update vanished
+   silently, on both machines, every time. This was the real, definitive
+   root cause of the entire receiving-side mystery from sections 28-29.
+   Fixed with a pure, stateless relay in `server/index.js`, mirroring
+   `code:change`'s own proven pattern exactly (`socket.to(roomId)`,
+   confirmed NOT `io.to`, so the sender is correctly excluded). Deployed
+   live to Railway, healthcheck passed. Deliberately does not store or
+   replay Yjs state to late joiners - out of scope for this session's
+   actual test scenario (two people joining and working together, not
+   late-joining with a history requirement).
+
+3. **A scheme guard was added** to `_setupYjsBinding()` to restrict Yjs
+   sync to virtual `livecollab://` room files only, on the theory that
+   real-disk (`file://`) files have genuinely different absolute paths
+   per machine and could never share a matching fileId.
+
+**Real, significant discovery from testing with the actual fixes in
+place**: the scheme guard broke the real-world use case rather than
+fixing an edge case. Confirmed directly from live logs on both
+machines: the host's file (opened via a real, locally-attached folder)
+has model URI `file:///Users/emmanuelokwuma/FOLDER 3/index.js`; the
+guest's same conceptual file has model URI
+`livecollab://{roomId}/index.js`. The scheme guard blocks Yjs
+activation entirely on the host's side for this common, real workflow
+- attaching a real project folder - since it never satisfies the
+`livecollab://` check. Yjs only activates on the guest's side, which
+is bound to a different, non-communicating document. There is no
+common identity between what the host is editing and what the guest is
+editing. This is not a small bug; it's a structural mismatch that
+existing fixes cannot patch around.
+
+**Real, honest root-cause framing of why this keeps happening**: the
+current architecture has each client maintaining its own local Yjs
+document (one backed by a real disk file on the host, one backed by a
+virtual filesystem on the guest), attempting to stay in sync
+peer-to-peer through a server that only relays messages with no
+awareness of document state or identity. The architecturally correct
+pattern for this kind of system is server-authoritative: one Yjs
+document lives on the server, every client (host included) holds a
+synchronized local binding to that one document, all edits go through
+the server first, and file identity is a server-assigned key (room ID
++ server-assigned file ID), never a client-computed local path or
+filename. The host's local disk should be the source of truth for
+INITIAL content and the destination for saves, but not the live,
+authoritative document during an active session.
+
+**Real, deliberate stopping point**: this is a genuine architectural
+decision, not a quick fix - restructure Yjs to be server-authoritative
+(the architecturally correct answer, with real, non-trivial
+implications for the server, the client services, and the timeline),
+versus finding the smallest patch that lets the current
+client-to-client-via-relay approach limp forward for a narrower test
+case. Recorded here, deliberately not decided or coded further this
+session, so the next session opens on this design question directly,
+with the same discipline this design doc has followed throughout -
+answer on paper first, then write code to match, rather than another
+well-intentioned patch that surfaces a new problem underneath it.
+
+**Real, concrete next-session starting point**: decide, on paper,
+whether Yjs moves server-side (correct, larger effort) or gets a
+narrower, explicitly-scoped patch for this session's specific two-
+person test case (faster, real technical debt). Do not write code
+until that decision is made explicitly.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay

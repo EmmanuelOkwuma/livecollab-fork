@@ -439,9 +439,11 @@ export class LiveCollabService extends Disposable {
 			this._yjsDocsSeeded.add(fileId);
 		}
 		doc.on('update', (update: Uint8Array, origin: unknown) => {
+			console.log('[LiveCollab] yjs doc update fired, origin:', origin, 'socket connected:', this.socket?.connected, 'update length:', update.length);
 			if (origin === 'remote') { return; }
 			if (!this.socket?.connected) { return; }
 			this.socket.emit('yjs:update', { fileId, update: Array.from(update) });
+			console.log('[LiveCollab] yjs:update emitted for fileId:', fileId);
 		});
 		this._yjsDocs.set(fileId, doc);
 		return doc;

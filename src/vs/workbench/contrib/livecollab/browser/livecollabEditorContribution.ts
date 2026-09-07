@@ -9,6 +9,7 @@ import { EditorContributionInstantiation, registerEditorContribution } from '../
 import { IEditorContribution } from '../../../../editor/common/editorCommon.js';
 import { livecollabService } from './livecollabService.js';
 import { createMonacoBaseAPI } from '../../../../editor/common/services/editorBaseApi.js';
+import { LIVECOLLAB_SCHEME } from './livecollabFileSystemProvider.js';
 // Type-only reference (no runtime import triggered) - the actual
 // runtime class is loaded via livecollabService.getMonacoBindingClass(),
 // see that file's own comments for the full reasoning (yjs/y-monaco
@@ -73,7 +74,7 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 			if (!model) { return; }
 
 			// Use filename only as fileId so host and guest paths match
-			const fileId = model.uri.path.split('/').pop() || model.uri.path;
+			const fileId = model.uri.path; // Real fix (PHASE3_YJS_DESIGN.md section 29 follow-up): was filename-only, causing files with the same name in different folders to incorrectly share one sync identity
 			const code = model.getValue();
 
 			livecollabService.emitCodeChange(livecollabService.roomId, fileId, code);
@@ -85,7 +86,7 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 			const model = this.editor.getModel();
 			if (!model) { return; }
 			// Use filename only as fileId so host and guest paths match
-			const fileId = model.uri.path.split('/').pop() || model.uri.path;
+			const fileId = model.uri.path; // Real fix (PHASE3_YJS_DESIGN.md section 29 follow-up): was filename-only, causing files with the same name in different folders to incorrectly share one sync identity
 			const cached = livecollabService.getFileContent(fileId);
 			if (cached !== undefined && cached !== model.getValue()) {
 				this._isApplyingRemoteChange = true;
@@ -114,7 +115,7 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 			const model = this.editor.getModel();
 			if (!model) { return; }
 
-			const modelFileId = model.uri.path.split('/').pop() || model.uri.path;
+			const modelFileId = model.uri.path; // Real fix: same filename-only bug as above
 			if (modelFileId !== fileId) { return; }
 
 			this._isApplyingRemoteChange = true;
@@ -136,10 +137,11 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 		// The guard here is what prevents the onDidChangeModelContent listener
 		// above from re-broadcasting this over the OLD code:change channel too.
 		this._register(livecollabService.onYjsUpdate(({ fileId, update }) => {
+			console.log('[LiveCollab] onYjsUpdate fired, fileId:', fileId, 'update length:', update.length);
 			const model = this.editor.getModel();
-			if (!model) { return; }
-			const modelFileId = model.uri.path.split('/').pop() || model.uri.path;
-			if (modelFileId !== fileId) { return; }
+			if (!model) { console.log('[LiveCollab] onYjsUpdate: no model, aborting'); return; }
+			const modelFileId = model.uri.path; // Real fix: same filename-only bug as above
+			if (modelFileId !== fileId) { console.log('[LiveCollab] onYjsUpdate: fileId mismatch, model is:', modelFileId, 'update is for:', fileId); return; }
 			this._applyRemoteYjsUpdate(fileId, update);
 		}));
 
@@ -174,6 +176,17 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 	// CURRENT model before committing the binding, so an older, slower-
 	// resolving call can never overwrite a newer one with a stale binding.
 	private async _setupYjsBinding(): Promise<void> {
+		// Real fix (PHASE3_YJS_DESIGN.md section 29 follow-up): Yjs sync is
+		// only meaningful for virtual livecollab:// room files, whose path
+		// is room-relative and identical on every machine. Real-disk
+		// (file://) files have genuinely different absolute paths per
+		// machine, so their fileId would never match between two people's
+		// own filesystems - without this guard, the relay fix could look
+		// broken for real-disk files when the actual problem is a fileId
+		// mismatch, not the sync mechanism itself.
+		const guardModel = this.editor.getModel();
+		if (guardModel && guardModel.uri.scheme !== LIVECOLLAB_SCHEME) { return; }
+
 		// Real, precise diagnostic (PHASE3_YJS_DESIGN.md section 29
 		// follow-up): this function had zero logging of its own, so a
 		// live two-machine test showing no Yjs-related console activity
@@ -186,7 +199,7 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 		console.log('[LiveCollab] _setupYjsBinding called');
 		const modelAtStart = this.editor.getModel();
 		if (!modelAtStart) { console.log('[LiveCollab] _setupYjsBinding: no model, aborting'); return; }
-		const fileId = modelAtStart.uri.path.split('/').pop() || modelAtStart.uri.path;
+		const fileId = modelAtStart.uri.path; // Real fix: same filename-only bug as above
 		// Captured synchronously, before any await, so this reflects whatever
 		// real content is ALREADY in the model right now (see
 		// PHASE3_YJS_DESIGN.md section 7 - a brand-new Y.Doc must be seeded
