@@ -1663,3 +1663,70 @@ this panel. This is real, separate feature work (not a bug in existing
 functionality) - needs actual backend wiring: save endpoints, real
 state updates connected to these UI elements. Not yet scoped or
 scheduled - flagging as a known gap for future planning.
+
+## #23 YJS CONCURRENT-EDITING RESTRUCTURE — PHASE 3 CORE GOAL CONFIRMED (2026-09-10)
+
+The actual goal of the roadmap's own Phase 3 (Yjs/CRDT for concurrent
+edits) - two real, physically separate machines, both people's edits
+surviving simultaneous typing in the same file - confirmed working
+live, with real console evidence from both machines. Full detail in
+PHASE3_YJS_DESIGN.md sections 27-32.
+
+HONEST SCORECARD:
+- Server-authoritative Yjs document store: DONE
+- Server-assigned file identity (Option A): DONE
+- Race condition fix (file-open-before-id-arrives): DONE
+- Seeding flow (server asks host for real content): DONE
+- Wrapper-folder fix: DONE, pending clean verification (see open items)
+- Concurrent editing confirmed working: DONE
+
+What got here: the previous, client-side Yjs architecture (each client
+holding its own local document, syncing peer-to-peer through a
+stateless relay) was found to be architecturally wrong, not patchable -
+recorded as a deliberate design decision, then rebuilt correctly as
+server-authoritative: one real Y.Doc per file lives on the server,
+clients request and sync to that state, all identity is server-
+assigned rather than client-computed. Along the way: a missing server-
+side yjs:update listener (real root cause of updates never being
+received), a host-side ack gap (socket.to excludes the sender, so the
+host never learned its own files' ids without a fix), a real race
+condition on first-file-open, and a real seeding gap (state.files never
+has entries for files shared via the real-time folder-broadcast flow)
+were each found and fixed with direct evidence, not guessed at.
+
+REAL TEST RESULT: two machines, real-time typing in different spots of
+the same file, both edits survived and appeared on both screens.
+onYjsUpdate fired continuously on both sides throughout, using the
+exact same real, server-assigned file id - confirmed directly from both
+machines' console logs, not assumed from visual result alone.
+
+OPEN ITEMS (not blocking the confirmed result, real cleanup before
+Phase 4 starts):
+1. Duplicate-folder mystery: the wrapper-folder fix's real effect on
+   the iMac showed the same real folders twice (once directly, once
+   duplicated inside "Shared Room") rather than the wrapper being
+   cleanly removed. Not yet explained - needs direct verification of
+   the actual build running on the iMac (stale copy vs. a real,
+   separate logic issue) before being called resolved.
+2. Language detection / syntax highlighting: files show as plain text
+   regardless of real extension. Flagged multiple times, never
+   properly traced. Deferred as a Phase 6 cleanup item - not urgent,
+   not forgotten.
+3. Clean repeat test: tonight's real pass had a real, uncontrolled
+   variable (the iMac's own performance/cold-start state, plus an
+   extension-host crash-loop present on both machines but unexplained).
+   A clean, uninterrupted repeat test is the real, final verification
+   before Phase 3 is called fully closed.
+
+CLEAN-UP SEQUENCE, IN ORDER, BEFORE PHASE 4 STARTS:
+1. Get the iMac to a known-good state - fresh build, directly verify
+   the wrapper fix is the code actually running, not a stale copy.
+2. Confirm no folder duplication in a clean test.
+3. Note language detection as Phase 6, not urgent.
+4. Run one clean, uninterrupted concurrent-edit test as final Phase 3
+   verification.
+
+Once that sequence is done cleanly, Phase 3 is genuinely closed and
+Phase 4 starts from a solid, verified foundation - not the same
+pattern (building forward on an unverified layer) that made this
+session's full Yjs restructure necessary in the first place.
