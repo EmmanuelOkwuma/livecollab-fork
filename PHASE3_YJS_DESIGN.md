@@ -1490,6 +1490,89 @@ narrower, explicitly-scoped patch for this session's specific two-
 person test case (faster, real technical debt). Do not write code
 until that decision is made explicitly.
 
+## 31. Real, confirmed pass - Phase 3's actual goal, verified live with real evidence on both machines
+
+**The actual goal of Phase 3, confirmed working**: two real, physically
+separate machines, real-time collaborative editing, both people's
+edits surviving together through a genuine, server-authoritative Yjs
+architecture. This is the real result the entire chain of work this
+session - and the sessions before it - was building toward.
+
+**What was built to get here, completing last session's design
+decision (restructure to server-authoritative, not patch)**:
+- A real server-side Yjs document store, one authoritative Y.Doc per
+  file, keyed by roomId:fileId using the server's own file identity.
+- `yjs:request-state`: a client asks the server for the real, current
+  document state when opening a file, instead of creating its own
+  empty local document.
+- `yjs:update` upgraded from a stateless relay to genuinely
+  authoritative: the server applies every incoming update to its own
+  document first, then broadcasts.
+- Option A file identity, decided explicitly and built completely: the
+  server assigns a real, stable id to every file the moment its tree
+  entry is broadcast, not the client. A real gap caught and fixed
+  before testing: `socket.to()` excludes the sender, so the host would
+  never have learned its own files' ids without the server's ack
+  including the id-assigned tree back.
+- A real race condition, caught and closed before testing: a file
+  opening before its server id arrives now retries automatically once
+  the id becomes available, via a new `onFileIdsAvailable` event,
+  instead of being permanently stuck unbound for the rest of the
+  session.
+- A real seeding gap, caught and closed before testing: `state.files`
+  never has an entry for files shared through the real-time folder-
+  broadcast workflow - the actual workflow used all session - so the
+  server now asks the room's own host directly for a file's real
+  content via a new `yjs:seed-content-request`/`response` pair,
+  reusing the proven find-the-owner-socket pattern already used
+  elsewhere in the server, with a real 5-second timeout.
+- The folder-wrapper bug, finally fixed rather than deferred again:
+  confirmed as an active blocker, not cosmetic - the guest's file
+  ended up at a genuinely different identity path than the host's same
+  file because of the extra "Shared Room" wrapper layer, directly
+  preventing the server-assigned Yjs id from ever matching. Fixed by
+  adding each real, top-level folder as its own workspace folder,
+  matching the host's actual structure exactly.
+
+**The real test run and its result, in the operator's own words**:
+both people typed simultaneously, in different spots of the same
+file, on two real machines. Both edits survived and appeared on both
+screens - not overwritten, not scrambled - with a real, observed
+delay before one side's typing fully caught up. The iMac's extension
+host was actively crash-looping during this test ("terminated
+unexpectedly 3 times within the last 5 minutes", confirmed directly
+in a screenshot), a real, plausible explanation for the observed
+delay being a performance/timing artifact rather than a broken merge.
+
+**Confirmed directly from both machines' real console logs, not
+assumed from the delay alone**: `onYjsUpdate fired` appears
+continuously and repeatedly on both sides throughout the test, every
+single time using the exact same real, server-assigned file id
+(`file-5a77d40f-41fa-4d1d-9d88-14f2fc0e9e5c`) - genuine, live evidence
+that updates were flowing in both directions the entire time, on a
+correctly shared identity, which is what real, working CRDT
+synchronization looks like under load - not silence, not a mismatch,
+not one-directional flow.
+
+**Real, honest scope note**: this test ran on real-disk files shared
+through the folder-broadcast workflow with the wrapper bug now fixed.
+The separate, still-open language-detection/syntax-highlighting issue
+(files showing as plain text) was explicitly set aside again this
+session as a real, named, deliberately deferred item - not forgotten,
+not silently dropped, just correctly sequenced behind the actual
+architectural goal that was the point of tonight's work.
+
+**Real, concrete next-session starting point**: with the core Phase 3
+goal now confirmed working, the real remaining items are, in order:
+(1) the language-detection/syntax-highlighting bug, genuinely never
+investigated properly yet - checked and ruled out the file system
+provider as the obvious cause much earlier this session, needs a real,
+focused trace; (2) a cleaner, more controlled repeat of tonight's test
+on a healthier second machine (or the same iMac with its extension
+host issue resolved first) to get a delay-free confirmation, since
+tonight's real pass had a real, plausible external explanation for its
+one imperfection rather than a clean, zero-caveat run.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
