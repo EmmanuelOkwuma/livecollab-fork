@@ -1573,6 +1573,65 @@ host issue resolved first) to get a delay-free confirmation, since
 tonight's real pass had a real, plausible external explanation for its
 one imperfection rather than a clean, zero-caveat run.
 
+## 32. Real corrections and additions to section 31 - a careful re-read, confirmed facts separated from hypotheses, and an improved diagnosis
+
+**A real correction to section 31's own framing, caught on review**: the
+delay during the Yjs test was attributed there to the iMac's extension
+host crash-looping. Re-reading the operator's own screenshots
+carefully, both machines showed that exact same message - the MacBook's
+own screenshot explicitly shows "Extension host terminated unexpectedly
+3 times within the last 5 minutes," not just the iMac's. Since both
+machines had the identical symptom but only the iMac showed delay,
+crash-looping alone doesn't explain it. Real, improved diagnosis: the
+extension host issue is most likely a separate, real problem affecting
+the whole app on both machines, not the cause of the sync delay itself.
+The operator's own, original theory - the iMac being genuinely older,
+slower 2017 Intel hardware that had sat unused and was started cold -
+better fits the evidence, since it explains why only the slower machine
+showed lag despite the identical crash-loop symptom on both. Recorded
+here as the operator's own hypothesis, not replaced with a different
+one as happened in the first write-up of this test.
+
+**The wrapper-folder structure, described precisely rather than
+flattened**: on the iMac, the real folders (.claude, app, lib, public,
+server) appeared directly under "Untitled (Workspace)" - matching the
+MacBook's own structure - and then appeared again, duplicated, nested
+inside a separate "Shared Room" folder underneath. Not a single wrapper
+replacing the structure; the same real content genuinely showing up
+twice at once. This is a real, open question, not something to assume
+an explanation for: it's unclear whether this means the new wrapper fix
+wasn't actually the build running on the iMac at that moment, or
+whether something separate (e.g. the tree being re-broadcast and
+`populateFromTree` running again, outside the `_virtualFolderAdded`
+guard that only prevents re-adding the *workspace folder* itself, not
+re-populating the virtual filesystem) caused a second, genuine
+population of the same real folders. Real, concrete next step: check
+the app's actual build timestamp or a unique, known string directly on
+the iMac before the next test, rather than assuming either explanation.
+
+**A real, separate UX idea, explicitly asked to be recorded rather than
+acted on**: "Shared Room" shouldn't take over as the structural parent
+of a file when the real, actual project folder is the true parent.
+Instead, it could exist as a visual signal on the Explorer - "this
+workspace is being broadcast" - without displacing the real folder name
+as the structural container. The operator explicitly said to scratch
+this for now but keep it recorded; deliberately not acted on this
+session, recorded here as asked.
+
+**A real, separate, earlier milestone in the same test session**:
+before the actual Yjs concurrent-typing test, the operator tested the
+older, non-Yjs code:change sync mechanism first, and confirmed it
+worked correctly on both computers. This was a distinct, real
+checkpoint reached before moving on to the Yjs-specific test - not the
+same thing as the Yjs confirmation itself, and worth keeping separate
+in the record.
+
+**A real, separate Explorer inconsistency, also observed during this
+same test**: the MacBook's folder tree opened in a collapsed state (no
+folders expanded); the iMac's opened with folders already expanded.
+A real, minor UI difference between host and guest, not yet
+investigated, recorded here rather than dropped.
+
 ## Next step
 
 Build a small, isolated prototype (same discipline as Stage 1's overlay
