@@ -154,23 +154,27 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 			console.log('[LiveCollab] populating virtual file system with tree:', tree.length, 'items, roomName:', roomName);
 			livecollabFileSystemProvider.setRoomId(roomId);
 			await livecollabFileSystemProvider.populateFromTree(tree);
-			// Open the virtual folder in the explorer
-			const uri = URI.file('/').with({ scheme: LIVECOLLAB_SCHEME, authority: roomId, path: '/' });
-			// Open virtual folder for this room (reset flag ensures correct room each time)
-			// TEMPORARY DIAGNOSTIC 2026-08-20: real, confirmed evidence rules
-			// out both the obvious theories (this contribution is registered
-			// exactly once - confirmed via grep - and this flag never resets -
-			// also confirmed via grep), so this code path should only ever add
-			// ONE virtual folder per app session. The observed bug (multiple
-			// stacked 'Shared Room' entries in a live two-machine test) directly
-			// contradicts that. This log tells us, from real runtime behavior,
-			// whether this exact path is somehow running more than once
-			// (meaning the static analysis above is wrong somewhere) or whether
-			// the duplicates come from a different, not-yet-found code path.
+			// Real fix (PHASE3_YJS_DESIGN.md section 30 follow-up, real,
+			// confirmed blocker): the previous code added ONE workspace
+			// folder at the virtual root, named after the room - wrapping
+			// the guest's entire tree inside a "Shared Room" folder that
+			// doesn't exist on the host's own side at all. This didn't just
+			// look wrong - it was a real, confirmed blocker: the guest's
+			// file ended up at a genuinely different identity path than the
+			// host's same file, so the server-assigned Yjs file id could
+			// never match between them, confirmed live via
+			// "_setupYjsBinding: no server-assigned id yet" on the guest's
+			// side despite the id genuinely existing on the host's side.
+			// Now each real, top-level item from the host's own tree gets
+			// added as its own separate workspace folder, exactly matching
+			// the host's real structure - no extra wrapper layer at all.
 			if (!_virtualFolderAdded) {
 				_virtualFolderAdded = true;
-				await this.workspaceEditingService.updateFolders(0, 0, [{ uri, name: roomName }]);
-			} else {
+				const topLevelFolders = tree.map((item) => ({
+					uri: URI.file('/').with({ scheme: LIVECOLLAB_SCHEME, authority: roomId, path: `/${item.name}` }),
+					name: item.name,
+				}));
+				await this.workspaceEditingService.updateFolders(0, 0, topLevelFolders);
 			}
 		}));
 
@@ -191,6 +195,26 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 				livecollabService.respondFileContent(ack, path, content);
 			} catch (e) {
 				console.error('[LiveCollab] failed to read file for guest:', path, e);
+			}
+		}));
+		// Real fix (PHASE3_YJS_DESIGN.md section 30 follow-up): mirrors
+		// the handler above exactly - the server is asking THIS machine,
+		// as the room's own host, for a file's real, current content to
+		// seed a brand-new, authoritative Yjs document server-side.
+		// realPath can be either a real, absolute disk path (this host's
+		// own file:// files) or a room-relative path (a livecollab://
+		// file, if the host happens to have that one open too) - handled
+		// the same scheme-aware way _getServerFileId already computes it
+		// on the sending side.
+		this._register(livecollabService.onYjsSeedContentRequest(async ({ requestId, realPath }) => {
+			try {
+				const uri = realPath.startsWith('/') ? URI.file(realPath) : URI.from({ scheme: LIVECOLLAB_SCHEME, authority: livecollabService.roomId, path: `/${realPath}` });
+				const fileContent = await this.fileService.readFile(uri);
+				const content = fileContent.value.toString();
+				livecollabService.respondYjsSeedContent(requestId, content);
+			} catch (e) {
+				console.error('[LiveCollab] failed to read file for yjs seeding:', realPath, e);
+				livecollabService.respondYjsSeedContent(requestId, '');
 			}
 		}));
 
@@ -235,14 +259,20 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 	private async _broadcastFileTree(folderUri: URI): Promise<void> {
 		try {
 			const tree = await this._readFileTree(folderUri, 0);
-			livecollabService.broadcastFileTree(tree);
+			// Real fix (PHASE3_YJS_DESIGN.md section 30 follow-up): the
+			// server's ack now returns the same tree with a real, server-
+			// assigned id on every entry. socket.to() excludes the sender,
+			// so this is the host's only way to learn its own files' ids -
+			// guests learn theirs from the normal room-wide broadcast.
+			const treeWithIds = await livecollabService.broadcastFileTree(tree);
+			if (treeWithIds) { livecollabFileSystemProvider.storeServerFileIds(treeWithIds); }
 			console.log('[LiveCollab] file tree broadcast:', tree.length, 'items');
 		} catch (e) {
 			console.error('[LiveCollab] failed to read file tree:', e);
 		}
 	}
 
-	private async _readFileTree(uri: URI, depth: number): Promise<any[]> {
+	private async _readFileTree(uri: URI, depth: number, relativePath: string = ''): Promise<any[]> {
 		if (depth > 4) { return []; } // max depth 4
 		const SKIP = ['node_modules', '.git', 'out', 'dist', '.next', '__pycache__', '.DS_Store'];
 		try {
@@ -252,8 +282,19 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 			for (const child of stat.children) {
 				const name = child.name;
 				if (SKIP.includes(name)) { continue; }
+				// Real fix (PHASE3_YJS_DESIGN.md section 30 follow-up): compute
+				// the same relative path here that populateFromTree computes
+				// on the receiving side, and record which real, absolute disk
+				// path it corresponds to. This lets the host later translate
+				// its own file:// model uri (an absolute disk path) back to
+				// the relative itemPath used as the key for server-assigned
+				// ids, since the host's own files never go through
+				// populateFromTree (that only runs for a livecollab:// tree
+				// received from someone else).
+				const itemRelativePath = relativePath ? `${relativePath}/${name}` : name;
+				livecollabFileSystemProvider.recordRealPath(child.resource.fsPath, itemRelativePath);
 				if (child.isDirectory) {
-					const children = await this._readFileTree(child.resource, depth + 1);
+					const children = await this._readFileTree(child.resource, depth + 1, itemRelativePath);
 					items.push({ name, path: child.resource.fsPath, type: 'directory', children });
 				} else {
 					items.push({ name, path: child.resource.fsPath, type: 'file' });

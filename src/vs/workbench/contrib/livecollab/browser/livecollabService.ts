@@ -104,6 +104,8 @@ export class LiveCollabService extends Disposable {
 
 	private readonly _onFileContentRequest = this._register(new Emitter<{ path: string; ack: any }>());
 	readonly onFileContentRequest: Event<{ path: string; ack: any }> = this._onFileContentRequest.event;
+	private readonly _onYjsSeedContentRequest = this._register(new Emitter<{ requestId: string; realPath: string }>());
+	readonly onYjsSeedContentRequest: Event<{ requestId: string; realPath: string }> = this._onYjsSeedContentRequest.event;
 
 	private readonly _onMemberJoined = this._register(new Emitter<void>());
 
@@ -128,6 +130,16 @@ export class LiveCollabService extends Disposable {
 	// (not per editor-contribution-instance) so multiple editors/panes on
 	// the same file never cause duplicate emits.
 	private readonly _yjsDocs = new Map<string, YDoc>();
+	// Real race guard (PHASE3_YJS_DESIGN.md section 30 follow-up):
+	// getOrCreateYjsDoc() now does real, awaited network work (requesting
+	// state from the server), and _setupYjsBinding() is called twice in
+	// practice for a brand-new file (constructor + onDidChangeModel,
+	// confirmed via real logs earlier this session) - without this,
+	// two concurrent calls for the same fileId could each create their
+	// own separate doc before either finishes, and the second would
+	// silently overwrite the first in _yjsDocs, leaving an already-bound
+	// MonacoBinding attached to an orphaned document.
+	private readonly _yjsDocsLoading = new Map<string, Promise<YDoc>>();
 	// PHASE3_YJS_DESIGN.md section 7 follow-up: real race found via a
 	// second live test - the synchronous seed in getOrCreateYjsDoc only
 	// catches content that's ALREADY in the model at binding time. If real
@@ -290,6 +302,15 @@ export class LiveCollabService extends Disposable {
 			console.log('[LiveCollab] file content requested:', path);
 			this._onFileContentRequest.fire({ path, ack });
 		});
+		// Real fix (PHASE3_YJS_DESIGN.md section 30 follow-up): mirrors
+		// room:file:request above exactly - the server asks the host
+		// directly for a file's real content to seed a brand-new,
+		// authoritative Yjs document, since state.files never has an
+		// entry for files shared via the real-time folder-broadcast flow.
+		this.socket.on('yjs:seed-content-request', ({ requestId, realPath }: { requestId: string; realPath: string }) => {
+			console.log('[LiveCollab] yjs seed content requested for:', realPath);
+			this._onYjsSeedContentRequest.fire({ requestId, realPath });
+		});
 		this.socket.on('room:state', (state: any) => {
 			if (state?.files) {
 				for (const f of state.files) { this._fileCache.set(f.id, f.content || ''); }
@@ -429,20 +450,64 @@ export class LiveCollabService extends Disposable {
 	// existing one, so real collaborative history is never at risk).
 	// Inserted BEFORE the update listener is registered, so the seed
 	// itself is local bootstrapping, never broadcast as a fake edit.
-	async getOrCreateYjsDoc(fileId: string, seedContent?: string): Promise<YDoc> {
+	async getOrCreateYjsDoc(fileId: string, seedContent?: string, realPath?: string): Promise<YDoc> {
 		const existing = this._yjsDocs.get(fileId);
 		if (existing) { return existing; }
+		const alreadyLoading = this._yjsDocsLoading.get(fileId);
+		if (alreadyLoading) { return alreadyLoading; }
+		const loadPromise = this._loadYjsDoc(fileId, seedContent, realPath);
+		this._yjsDocsLoading.set(fileId, loadPromise);
+		try {
+			return await loadPromise;
+		} finally {
+			this._yjsDocsLoading.delete(fileId);
+		}
+	}
+	private async _loadYjsDoc(fileId: string, seedContent?: string, realPath?: string): Promise<YDoc> {
 		const Y = await this.getYjsModule();
 		const doc = new Y.Doc();
-		if (seedContent) {
-			doc.getText('content').insert(0, seedContent);
-			this._yjsDocsSeeded.add(fileId);
+		// Real, server-authoritative rewrite (PHASE3_YJS_DESIGN.md section
+		// 30): this used to seed a brand-new, empty local doc directly from
+		// whatever content happened to be in this client's own editor -
+		// the real root of the architectural mismatch found this session,
+		// since the host's and guest's own local content could genuinely
+		// differ or use different file identities entirely. Now this asks
+		// the server for its real, current, authoritative state instead,
+		// and applies that - the server is the source of truth, this
+		// client is a synchronized view of it, not an independent copy
+		// trying to stay in sync peer-to-peer.
+		if (this.socket?.connected && this._roomId) {
+			try {
+				// Real fix (PHASE3_YJS_DESIGN.md section 30 follow-up, real
+				// gap caught before testing): state.files never has an entry
+				// for files shared via the real-time folder-broadcast flow -
+				// confirmed directly, that array is only ever populated by a
+				// separate create-file/restore-snapshot flow. Without the real
+				// path, the server has no way to ask the host for this file's
+				// actual content when seeding a brand-new doc, and would seed
+				// an empty one every time. realPath is the client's own,
+				// already-known path for this file - the real disk path for
+				// the host's own file:// files, the room-relative path for
+				// livecollab:// files - exactly what room:file:request already
+				// uses to ask the host for content elsewhere in this codebase.
+				const response = await new Promise<{ ok: boolean; state?: number[]; error?: string }>((resolve) => {
+					this.socket!.emit('yjs:request-state', { roomId: this._roomId, fileId, realPath }, (ack: { ok: boolean; state?: number[]; error?: string }) => resolve(ack));
+				});
+				if (response?.ok && response.state) {
+					Y.applyUpdate(doc, new Uint8Array(response.state), 'remote');
+					console.log('[LiveCollab] applied real server state for fileId:', fileId, 'length:', response.state.length);
+				} else {
+					console.log('[LiveCollab] yjs:request-state failed:', response?.error);
+				}
+			} catch (e) {
+				console.log('[LiveCollab] yjs:request-state error:', e);
+			}
 		}
 		doc.on('update', (update: Uint8Array, origin: unknown) => {
 			console.log('[LiveCollab] yjs doc update fired, origin:', origin, 'socket connected:', this.socket?.connected, 'update length:', update.length);
 			if (origin === 'remote') { return; }
 			if (!this.socket?.connected) { return; }
-			this.socket.emit('yjs:update', { fileId, update: Array.from(update) });
+			this.socket.emit('yjs:update', { roomId: this._roomId, fileId, update: Array.from(update) });
 			console.log('[LiveCollab] yjs:update emitted for fileId:', fileId);
 		});
 		this._yjsDocs.set(fileId, doc);
@@ -571,15 +636,33 @@ export class LiveCollabService extends Disposable {
 
 	
 
-	broadcastFileTree(tree: any[]): void {
-		if (!this.socket?.connected || !this._roomId) { return; }
+	// Real fix (PHASE3_YJS_DESIGN.md section 30, Option A): now returns
+	// the id-assigned tree from the server's own ack, so the host - who
+	// never receives its own broadcast back via the normal room-wide
+	// emit - can still learn the exact same server-assigned file ids
+	// that every guest receives, instead of only guests ever having them.
+	async broadcastFileTree(tree: any[]): Promise<any[] | undefined> {
+		if (!this.socket?.connected || !this._roomId) { return undefined; }
 		console.log('[LiveCollab] broadcasting file tree with roomName:', this._roomName);
-		this.socket.emit('room:file:tree', { roomId: this._roomId, tree, roomName: this._roomName || 'Shared Room' });
+		return new Promise((resolve) => {
+			this.socket!.emit('room:file:tree', { roomId: this._roomId, tree, roomName: this._roomName || 'Shared Room' }, (ack: { ok: boolean; tree?: any[] }) => {
+				resolve(ack?.tree);
+			});
+		});
 	}
 
 	respondFileContent(ack: any, path: string, fileContent: string): void {
 		if (!this.socket?.connected) { return; }
 		this.socket.emit('room:file:response', { requesterId: ack, path, content: fileContent });
+	}
+	// Real fix (PHASE3_YJS_DESIGN.md section 30 follow-up): mirrors
+	// respondFileContent above exactly, completing the real seeding
+	// flow - sends this host's real file content back to the server
+	// so it can seed a brand-new, authoritative Yjs document correctly
+	// instead of silently seeding an empty one.
+	respondYjsSeedContent(requestId: string, content: string): void {
+		if (!this.socket?.connected) { return; }
+		this.socket.emit('yjs:seed-content-response', { requestId, content });
 	}
 
 	requestFileContent(path: string): void {

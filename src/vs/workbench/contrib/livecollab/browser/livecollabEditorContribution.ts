@@ -9,7 +9,7 @@ import { EditorContributionInstantiation, registerEditorContribution } from '../
 import { IEditorContribution } from '../../../../editor/common/editorCommon.js';
 import { livecollabService } from './livecollabService.js';
 import { createMonacoBaseAPI } from '../../../../editor/common/services/editorBaseApi.js';
-import { LIVECOLLAB_SCHEME } from './livecollabFileSystemProvider.js';
+import { LIVECOLLAB_SCHEME, livecollabFileSystemProvider } from './livecollabFileSystemProvider.js';
 // Type-only reference (no runtime import triggered) - the actual
 // runtime class is loaded via livecollabService.getMonacoBindingClass(),
 // see that file's own comments for the full reasoning (yjs/y-monaco
@@ -47,6 +47,25 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 	private _isApplyingYjsChange = false;
 	private _yjsBinding: YMonacoBinding | undefined;
 
+	// Real fix (PHASE3_YJS_DESIGN.md section 30, Option A - decided
+	// explicitly: server assigns identity, not clients). Translates a
+	// model's own uri into the real, server-assigned file id, the same
+	// one every machine in the room agrees on - a livecollab:// file's
+	// path is already the relative itemPath used as the lookup key
+	// directly; a real file:// file's absolute disk path must first be
+	// translated back to that same itemPath via the map recorded when
+	// the tree was read. Returns undefined if no server id exists yet
+	// (e.g. file not yet broadcast/id-assigned) - callers must treat
+	// that as "can't sync yet", not fall back to a client-computed
+	// identity, since that's the exact class of bug this fix replaces.
+	private _getServerFileId(model: { uri: { scheme: string; path: string; fsPath: string } }): string | undefined {
+		const itemPath = model.uri.scheme === LIVECOLLAB_SCHEME
+			? model.uri.path.replace(/^\//, '')
+			: livecollabFileSystemProvider.getItemPathForRealPath(model.uri.fsPath);
+		if (!itemPath) { return undefined; }
+		return livecollabFileSystemProvider.getServerFileId(itemPath);
+	}
+
 	constructor(
 		private readonly editor: ICodeEditor,
 	) {
@@ -62,6 +81,18 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 		// MonacoBinding never appeared anywhere in the captured logs.
 		// Call it here too so the very first file gets bound as well.
 		this._setupYjsBinding();
+
+		// Real fix (PHASE3_YJS_DESIGN.md section 30 follow-up, real race
+		// condition caught and closed before testing): the attempt above
+		// can genuinely find no server-assigned id yet if this file opens
+		// before the tree has finished being read/broadcast. Without this,
+		// that first file would silently never get a Yjs binding for the
+		// rest of the session, since the only other call site is a file-
+		// switch that may never happen. Retrying here, once ids actually
+		// become available, closes that gap.
+		this._register(livecollabFileSystemProvider.onFileIdsAvailable(() => {
+			if (!this._yjsBinding) { this._setupYjsBinding(); }
+		}));
 
 		// Emit code changes to socket when user types
 		this._register(this.editor.onDidChangeModelContent(() => {
@@ -140,7 +171,7 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 			console.log('[LiveCollab] onYjsUpdate fired, fileId:', fileId, 'update length:', update.length);
 			const model = this.editor.getModel();
 			if (!model) { console.log('[LiveCollab] onYjsUpdate: no model, aborting'); return; }
-			const modelFileId = model.uri.path; // Real fix: same filename-only bug as above
+			const modelFileId = this._getServerFileId(model);
 			if (modelFileId !== fileId) { console.log('[LiveCollab] onYjsUpdate: fileId mismatch, model is:', modelFileId, 'update is for:', fileId); return; }
 			this._applyRemoteYjsUpdate(fileId, update);
 		}));
@@ -176,17 +207,6 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 	// CURRENT model before committing the binding, so an older, slower-
 	// resolving call can never overwrite a newer one with a stale binding.
 	private async _setupYjsBinding(): Promise<void> {
-		// Real fix (PHASE3_YJS_DESIGN.md section 29 follow-up): Yjs sync is
-		// only meaningful for virtual livecollab:// room files, whose path
-		// is room-relative and identical on every machine. Real-disk
-		// (file://) files have genuinely different absolute paths per
-		// machine, so their fileId would never match between two people's
-		// own filesystems - without this guard, the relay fix could look
-		// broken for real-disk files when the actual problem is a fileId
-		// mismatch, not the sync mechanism itself.
-		const guardModel = this.editor.getModel();
-		if (guardModel && guardModel.uri.scheme !== LIVECOLLAB_SCHEME) { return; }
-
 		// Real, precise diagnostic (PHASE3_YJS_DESIGN.md section 29
 		// follow-up): this function had zero logging of its own, so a
 		// live two-machine test showing no Yjs-related console activity
@@ -199,7 +219,8 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 		console.log('[LiveCollab] _setupYjsBinding called');
 		const modelAtStart = this.editor.getModel();
 		if (!modelAtStart) { console.log('[LiveCollab] _setupYjsBinding: no model, aborting'); return; }
-		const fileId = modelAtStart.uri.path; // Real fix: same filename-only bug as above
+		const fileId = this._getServerFileId(modelAtStart);
+		if (!fileId) { console.log('[LiveCollab] _setupYjsBinding: no server-assigned id yet for this file, skipping'); return; }
 		// Captured synchronously, before any await, so this reflects whatever
 		// real content is ALREADY in the model right now (see
 		// PHASE3_YJS_DESIGN.md section 7 - a brand-new Y.Doc must be seeded
@@ -211,7 +232,13 @@ export class LiveCollabEditorContribution extends Disposable implements IEditorC
 		const currentContent = modelAtStart.getValue();
 
 		try {
-		const doc = await livecollabService.getOrCreateYjsDoc(fileId, currentContent);
+		// Real path the client already knows for this file - livecollab://
+		// files use their own room-relative path directly; real disk
+		// files use their real, absolute fsPath (what the host would need
+		// to look this file up on its own real filesystem if the server
+		// has to ask it for content).
+		const realPath = modelAtStart.uri.scheme === LIVECOLLAB_SCHEME ? modelAtStart.uri.path.replace(/^\//, '') : modelAtStart.uri.fsPath;
+		const doc = await livecollabService.getOrCreateYjsDoc(fileId, currentContent, realPath);
 		console.log('[LiveCollab] _setupYjsBinding: got Y.Doc for fileId:', fileId);
 		const MonacoBindingClass = await livecollabService.getMonacoBindingClass();
 		console.log('[LiveCollab] _setupYjsBinding: got MonacoBinding class:', !!MonacoBindingClass);

@@ -6,6 +6,7 @@ import { InMemoryFileSystemProvider } from '../../../../platform/files/common/in
 import { URI } from '../../../../base/common/uri.js';
 import { VSBuffer } from '../../../../base/common/buffer.js';
 import { livecollabService } from './livecollabService.js';
+import { Emitter, Event } from '../../../../base/common/event.js';
 
 export const LIVECOLLAB_SCHEME = 'livecollab';
 
@@ -13,6 +14,64 @@ export class LiveCollabFileSystemProvider extends InMemoryFileSystemProvider {
 
 	private _roomId: string = '';
 	private _pendingRequests = new Map<string, (content: string) => void>();
+	// Real fix (PHASE3_YJS_DESIGN.md section 30, Option A - server
+	// assigns identity, not clients). The server now assigns a real,
+	// stable id to every file the first time its tree entry is
+	// broadcast, and preserves that same id across re-broadcasts. This
+	// map stores that server-assigned id per itemPath (the same string
+	// used to build this file's livecollab:// URI, so it can be looked
+	// up directly from a model's own uri.path when needed), replacing
+	// the previous approach of using the client-computed path itself as
+	// the sync identity - which never matched between a host's real
+	// disk file and a guest's virtual copy of the same conceptual file.
+	private readonly _serverFileIds = new Map<string, string>();
+	getServerFileId(itemPath: string): string | undefined {
+		return this._serverFileIds.get(itemPath);
+	}
+	// Real fix (PHASE3_YJS_DESIGN.md section 30 follow-up): the host
+	// never runs populateFromTree for its own broadcast (socket.to()
+	// excludes the sender), so it would never learn its own files'
+	// server-assigned ids without this. This stores ids only, without
+	// touching the virtual filesystem itself - the host's own files
+	// already exist for real on disk, so only the id needs recording.
+	storeServerFileIds(tree: any[], basePath: string = ''): void {
+		for (const item of tree) {
+			const itemPath = basePath ? `${basePath}/${item.name}` : item.name;
+			if (item.id) { this._serverFileIds.set(itemPath, item.id); this._onFileIdsAvailable.fire(); }
+			if (item.type === 'directory' && item.children?.length > 0) {
+				this.storeServerFileIds(item.children, itemPath);
+			}
+		}
+	}
+	// Real fix (PHASE3_YJS_DESIGN.md section 30 follow-up): the host's
+	// own model uri for a real, locally-attached file is its absolute
+	// disk path (file:// scheme) - not the relative itemPath used as
+	// the key for server-assigned ids. This maps a real, absolute path
+	// back to the relative itemPath computed when the tree was first
+	// read, so _setupYjsBinding() can translate a host's own file:// uri
+	// into the same identity space guests already use for livecollab://
+	// files.
+	// Real fix (PHASE3_YJS_DESIGN.md section 30 follow-up, real race
+	// condition caught before testing): _setupYjsBinding() can genuinely
+	// run before either id map above is populated, if a file opens
+	// right on room join before the tree finishes reading/broadcasting.
+	// The existing code already handles that moment gracefully (skips
+	// with a log, doesn't crash) - but without this event, if the id
+	// becomes available moments later and the user never happens to
+	// switch files afterward, that first file would be permanently
+	// stuck with no Yjs binding for the rest of the session. This fires
+	// whenever either populateFromTree (guest's own tree arriving) or
+	// storeServerFileIds (host learning its own ids back via ack) adds
+	// real ids, so a listener can retry a previously-skipped binding.
+	private readonly _onFileIdsAvailable = new Emitter<void>();
+	readonly onFileIdsAvailable: Event<void> = this._onFileIdsAvailable.event;
+	private readonly _realPathToItemPath = new Map<string, string>();
+	recordRealPath(realPath: string, itemPath: string): void {
+		this._realPathToItemPath.set(realPath, itemPath);
+	}
+	getItemPathForRealPath(realPath: string): string | undefined {
+		return this._realPathToItemPath.get(realPath);
+	}
 
 	constructor() {
 		super();
@@ -41,6 +100,11 @@ export class LiveCollabFileSystemProvider extends InMemoryFileSystemProvider {
 	async populateFromTree(tree: any[], basePath: string = ''): Promise<void> {
 		for (const item of tree) {
 			const itemPath = basePath ? `${basePath}/${item.name}` : item.name;
+			// Real fix (PHASE3_YJS_DESIGN.md section 30): store the server-
+			// assigned id for this file, so _setupYjsBinding() can look it
+			// up later by this same itemPath and use the real, shared
+			// server identity instead of a client-computed one.
+			if (item.id) { this._serverFileIds.set(itemPath, item.id); this._onFileIdsAvailable.fire(); }
 			const uri = URI.from({ scheme: LIVECOLLAB_SCHEME, authority: this._roomId, path: `/${itemPath}` });
 			if (item.type === 'directory') {
 				try { await this.mkdir(uri); } catch { }
