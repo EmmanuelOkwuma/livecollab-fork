@@ -170,7 +170,23 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 			// the host's real structure - no extra wrapper layer at all.
 			if (!_virtualFolderAdded) {
 				_virtualFolderAdded = true;
-				const topLevelFolders = tree.map((item) => ({
+				// Real fix (PHASE3_YJS_DESIGN.md section 32 follow-up, real bug
+				// caught with direct evidence): the previous version mapped
+				// every single tree item, including individual root-level
+				// files (.env.local, package.json, etc.), into its own,
+				// separate workspace folder - a file can't be a valid
+				// workspace root at all in VS Code's own model. Confirmed via
+				// the marker log showing 19 real items processed, matching
+				// exactly 5 real folders plus 14 real root-level files after
+				// the skip list - all 19 were being passed to updateFolders,
+				// not just the 5 real directories, very likely the real cause
+				// of the observed "Shared Room" grouping behavior. Only real
+				// directories should become their own workspace folder; root-
+				// level files already exist correctly in the virtual
+				// filesystem via populateFromTree above and don't need this.
+				const realDirectories = tree.filter((item) => item.type === 'directory');
+				console.log('[LiveCollab] BUILD-VERIFY-2026-09-10 wrapper-fix-active, real top-level items:', tree.length, 'real directories:', realDirectories.length);
+				const topLevelFolders = realDirectories.map((item) => ({
 					uri: URI.file('/').with({ scheme: LIVECOLLAB_SCHEME, authority: roomId, path: `/${item.name}` }),
 					name: item.name,
 				}));
