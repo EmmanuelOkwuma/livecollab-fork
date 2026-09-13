@@ -1730,3 +1730,29 @@ Once that sequence is done cleanly, Phase 3 is genuinely closed and
 Phase 4 starts from a solid, verified foundation - not the same
 pattern (building forward on an unverified layer) that made this
 session's full Yjs restructure necessary in the first place.
+
+## #24 PHASE 3 OPEN ITEM — DUPLICATE FOLDER / WRAPPER REGRESSION (2026-09-11)
+
+Root cause of "Shared Room" wrapper: confirmed as files being passed to
+updateFolders() alongside real directories (19 items instead of 5 real
+top-level directories).
+
+Fix attempted: filter tree to directories only before calling
+updateFolders().
+
+Result: duplication still present, new regression introduced -
+"unable to resolve non-existent file" errors now appear on real
+folders and files that did not show this error before.
+
+Leading theory, not yet confirmed: the _virtualFolderAdded guard may
+reset between the two expected tree broadcasts (once on the host's own
+folder-attach, once again on new member join), causing updateFolders()
+to run twice and create duplicate workspace folder entries.
+
+Next step: verify guard state persistence across both broadcasts with
+direct logging, then fix based on that evidence - not another guess.
+
+STATUS: OPEN, NOT BLOCKING. The concurrent-edit result (real-time
+collaborative editing via server-authoritative Yjs, confirmed working
+live with real evidence from both machines) stands independently of
+this. This is a folder-display problem, not a sync problem.
