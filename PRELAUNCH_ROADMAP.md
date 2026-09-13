@@ -1808,3 +1808,61 @@ caveat above, worth confirming with a repeat-join test). Extension
 host crash-loop - OPEN, root cause unknown, one real theory ruled out.
 Neither blocks the core, confirmed Phase 3 result (real-time
 collaborative editing via server-authoritative Yjs).
+
+## #26 KNOWN, DELIBERATE ARCHITECTURAL SHORTCUTS — WHERE TO GO WHEN WE COME BACK TO FIX THEM PROPERLY (2026-09-13)
+
+Requested explicitly: a precise record of every place this session
+took a working-for-now shortcut instead of the fully correct
+architecture, so future work knows exactly where to go rather than
+re-discovering these from scratch.
+
+**1. Folder structure flattening (real patch, not correct
+architecture) — livecollabFolderContribution.ts, the onFileTree
+handler.** When a guest joins, each of the host's real top-level
+directories (e.g. .claude, app, lib, public, server) is added as its
+own, separate, independent workspace root - not nested inside one
+real parent folder (e.g. "livecollab") the way the host actually has
+it. VS Code's own multi-root workspace model treats these as
+genuinely unrelated roots once separated - there is no retained
+concept that they came from one parent. Real, concrete consequence: a
+guest choosing "Remove folder from workspace" on just one of these
+(e.g. "app") removes only that one; the other four remain, with no
+awareness anything happened. What correct looks like (matching how
+VS Code's own Live Share does this): identify the single real
+top-level folder the host actually opened, and add that ONE folder as
+the workspace root, with its real children nested inside it exactly
+as they exist on the host's disk. Why the patch instead: the actual,
+urgent bug being fixed was individual root-level files (like
+.env.local) being incorrectly passed in as their own invalid
+workspace roots alongside real directories - the quick fix was "only
+pass real directories, but still pass each one separately," not "add
+the one real parent correctly." Real severity: moderate, not severe -
+no data loss, no sync corruption, purely a display/organization
+inconsistency. Fully fixable later without touching Yjs, identity, or
+sync logic.
+
+**2. Seeding flow has no late-joiner history replay (a real,
+deliberately-scoped limitation, not a hidden shortcut) — the
+yjs:request-state server handler and the client's getOrCreateYjsDoc.**
+When a brand-new Yjs document is created server-side, it's seeded
+once from the file's real, current content (from disk via the host,
+or from state.files) - it does not replay the actual sequence of Yjs
+edits that happened before a person joins mid-session. This was named
+and decided explicitly as out of scope when the seeding flow was
+built, on the basis that this session's real test scenario was two
+people joining and working together from the start, not someone
+joining hours into an active session. Real, concrete consequence: a
+person joining a file already being edited by others gets the
+CURRENT real content correctly, but not the ability to see edit
+history or any CRDT-level merge benefit for edits made before they
+joined - functionally equivalent to a fresh start from current state,
+not a gap in current, live collaboration.
+
+**Confirmed NOT shortcuts - the real, correct architecture underneath
+both of the above:** the server-authoritative Yjs document store
+(one real document per file, living on the server, not per-client),
+server-assigned file identity (Option A - the server assigns ids, not
+clients), and the race-condition retry mechanism (onFileIdsAvailable)
+are all real, standard, correct patterns - not things to revisit for
+architectural correctness, only for their own, separate bugs if any
+surface later.
