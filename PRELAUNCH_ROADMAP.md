@@ -1756,3 +1756,55 @@ STATUS: OPEN, NOT BLOCKING. The concurrent-edit result (real-time
 collaborative editing via server-authoritative Yjs, confirmed working
 live with real evidence from both machines) stands independently of
 this. This is a folder-display problem, not a sync problem.
+
+## #25 PHASE 3 — DUPLICATE-FOLDER/WRAPPER REGRESSION RESOLVED, EXTENSION HOST CRASH-LOOP REMAINS OPEN (2026-09-13)
+
+Real, confirmed resolution of #24's open item: on a fresh room (not the
+same room instance that showed the regression), the iMac's Explorer
+showed the correct real folder structure (.claude, app, lib, public,
+server) directly under the workspace root - no "Shared Room" wrapper,
+no duplication, no yellow warning icons. Confirmed directly from the
+console: the build-verify marker showed the correct, expected count
+(19 real items, 5 real directories) and the Explorer visually matched
+that. The directory-filter fix from #24 is confirmed working correctly
+when tested on a genuinely fresh room.
+
+Real, honest open question this surfaces: the previous regression
+(duplication, "unable to resolve non-existent file" errors) appeared
+on an existing room; this real fix confirmation happened on a newly
+created room. Not yet confirmed whether the earlier regression was
+tied to stale, corrupted per-room state client-side, or was
+transient/related to the extension host crash-loop happening
+simultaneously. Real, concrete next step if this resurfaces: test
+directly on the SAME long-running room across multiple joins, not just
+a fresh one, before calling this fully, unconditionally resolved.
+
+Real, separate, deliberate trade-off surfaced by this same fix: the
+real, original parent folder name (e.g. "livecollab") is no longer
+shown anywhere on the guest's side - each of its real child folders
+becomes its own separate, flat workspace root instead. This is a
+direct, expected consequence of the fix, not a new bug. Connects
+directly to the UX idea recorded in PHASE3_YJS_DESIGN.md section 32,
+explicitly deferred: use "Shared Room" (or the real parent name) as a
+visual label only, without it being the structural parent. Real,
+optional follow-up, not blocking.
+
+Extension host crash-loop, confirmed still genuinely unresolved: this
+was present on BOTH machines throughout tonight's testing
+("Extension host terminated unexpectedly 3 times within the last 5
+minutes", Code: 0, Signal: unknown, "No extensions were activated").
+One real theory was tested directly - a stale reference to the
+deliberately-removed GitHub.copilot-chat extension in product.json's
+builtInExtensionsEnabledWithAutoUpdates - confirmed, with direct
+testing, that removing this reference does NOT resolve the crash-loop.
+Root cause remains genuinely unknown. Real, concrete next step: trace
+directly why the extension host process itself exits with code 0
+(a clean exit, not a crash signal) before any extension activates,
+on a machine with copilot/microsoft-authentication already removed
+from the package - likely a different, still-unfound real cause.
+
+STATUS: Folder-display regression - RESOLVED (with the fresh-room
+caveat above, worth confirming with a repeat-join test). Extension
+host crash-loop - OPEN, root cause unknown, one real theory ruled out.
+Neither blocks the core, confirmed Phase 3 result (real-time
+collaborative editing via server-authoritative Yjs).
