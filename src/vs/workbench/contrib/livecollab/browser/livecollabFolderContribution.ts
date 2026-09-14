@@ -28,6 +28,27 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 	) {
 		super();
 
+		// Real fix (real root cause, confirmed with direct evidence): virtual
+		// livecollab:// workspace folders persist into the workspace file and
+		// get restored on next launch, but they are only ever valid for the
+		// one specific room they were created for. The existing leave-room
+		// cleanup below deliberately removes only REAL folders, never these -
+		// so they accumulate forever. Confirmed live: a guest's Explorer showed
+		// folders from a previous room (room-d9b733f5) while actually being in
+		// a different room (room-c0eaa19d), producing "Unable to resolve
+		// nonexistent file" on every entry, with all those errors firing at
+		// startup before LiveCollab even initialized. Removing them here, at
+		// construction, means every session starts clean rather than
+		// inheriting dead references to rooms that no longer exist.
+		const staleVirtualFolders = this.workspaceContextService.getWorkspace().folders
+			.filter(f => f.uri.scheme === LIVECOLLAB_SCHEME);
+		if (staleVirtualFolders.length > 0) {
+			console.log('[LiveCollab] removing', staleVirtualFolders.length, 'stale virtual room folders from a previous session');
+			const firstIndex = this.workspaceContextService.getWorkspace().folders
+				.findIndex(f => f.uri.scheme === LIVECOLLAB_SCHEME);
+			this.workspaceEditingService.updateFolders(firstIndex, staleVirtualFolders.length);
+		}
+
 		// When socket connects — attach current folder content to active room (if any)
 		this._register(livecollabService.onConnected(() => {
 			console.log('[LiveCollab] socket connected — checking folder');
@@ -275,6 +296,20 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 	private async _broadcastFileTree(folderUri: URI): Promise<void> {
 		try {
 			const tree = await this._readFileTree(folderUri, 0);
+			// Real fix (real root cause, found with direct evidence): a guest
+			// joining a room runs this exact same code against its own,
+			// genuinely empty workspace and broadcasts "0 items" into the
+			// room - confirmed live on the iMac's own console. That empty
+			// broadcast then overwrites the host's real, populated tree
+			// server-side, wiping it out for everyone and leaving the guest's
+			// own Explorer permanently empty. An empty tree is never
+			// meaningful to broadcast and can only ever destroy real data, so
+			// it's guarded against entirely here rather than special-casing
+			// host-vs-guest, which would be fragile.
+			if (!tree || tree.length === 0) {
+				console.log('[LiveCollab] skipping broadcast of empty file tree - nothing real to share');
+				return;
+			}
 			// Real fix (PHASE3_YJS_DESIGN.md section 30 follow-up): the
 			// server's ack now returns the same tree with a real, server-
 			// assigned id on every entry. socket.to() excludes the sender,

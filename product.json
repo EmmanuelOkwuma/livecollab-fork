@@ -231,6 +231,8 @@
 			"type": "light"
 		}
 	],
-	"builtInExtensionsEnabledWithAutoUpdates": [],
+	"builtInExtensionsEnabledWithAutoUpdates": [
+		"GitHub.copilot-chat"
+	],
 	"sessionsWindowAllowedExtensions": []
 }
