@@ -69,6 +69,14 @@ export class LiveCollabService extends Disposable {
 	private _lastMembers: ILiveCollabMember[] = [];
 	private _fileCache: Map<string, string> = new Map();
 	private _connecting = false;
+	// Tracks whether this room's file tree has arrived over the socket
+	// (via the host's one-shot room:file:tree broadcast). Used to arm a
+	// fallback: a guest that joins during a host extension-host crash-loop
+	// never sees that broadcast, so if the tree hasn't landed shortly
+	// after joining we pull it on demand via room:request-tree. Reset to
+	// false on every guest join so the fallback is armed fresh each time.
+	private _fileTreeReceived = false;
+	private _treeFallbackTimer: ReturnType<typeof setTimeout> | undefined;
 	// PHASE3_YJS_DESIGN.md sections 11-12: the Clerk session token has a
 	// confirmed 60-second lifetime (decoded directly from a real JWT).
 	// This timer proactively re-mints it well before expiry, so a stale
@@ -290,6 +298,8 @@ export class LiveCollabService extends Disposable {
 		this.socket.on('room:file:tree', ({ tree, roomName }: { tree: any[], roomName?: string }) => {
 			const resolvedName = roomName || this._roomName || 'Shared Room';
 			console.log('[LiveCollab] file tree received:', tree.length, 'items, roomName:', resolvedName);
+			// Broadcast landed - disarm the room:request-tree fallback.
+			this._fileTreeReceived = true;
 			if (roomName) { this._roomName = roomName; }
 			this._onFileTree.fire({ tree, roomName: resolvedName });
 		});
@@ -327,6 +337,15 @@ export class LiveCollabService extends Disposable {
 		return new Promise((resolve) => {
 			this.socket.emit('room:join', { roomId, displayName: this._displayName, colorIndex: 0 }, (res: any) => {
 				if (res?.userId) { this._myUserId = res.userId; }
+				// Arm the room:request-tree fallback for guests only. The owner
+				// is the tree's own source (it never receives room:file:tree
+				// back, so _fileTreeReceived would stay false and the fallback
+				// would wrongly request+populate a virtual tree over its real
+				// file:// folders). res.role comes straight from the join ack.
+				if (res?.role && res.role !== 'owner') {
+					this._fileTreeReceived = false;
+					this._scheduleTreeFallback();
+				}
 				// Fire onRoomJoined so listeners (livecollabFolderContribution.ts)
 				// can restore any Scenario 1 saved state for THIS room. See
 				// PHASE2_OVERLAY_DESIGN.md section 6.
@@ -336,6 +355,38 @@ export class LiveCollabService extends Disposable {
 		});
 	}
 
+
+	// Fallback for a guest that joins during a host extension-host
+	// crash-loop and so never catches the host's one-shot room:file:tree
+	// broadcast. After a short delay - long enough for the normal join ->
+	// host re-broadcast -> guest round trip to land first - if the tree
+	// still hasn't arrived, pull the server's stored copy on demand and
+	// feed it through the SAME _onFileTree pipeline the broadcast uses, so
+	// the consuming side (livecollabFolderContribution.ts) is unchanged.
+	private _scheduleTreeFallback(): void {
+		if (this._treeFallbackTimer) { clearTimeout(this._treeFallbackTimer); }
+		this._treeFallbackTimer = setTimeout(() => {
+			this._treeFallbackTimer = undefined;
+			// Broadcast already landed, or we've left/disconnected - nothing to do.
+			if (this._fileTreeReceived) { return; }
+			if (!this.socket?.connected || !this._roomId) { return; }
+			console.log('[LiveCollab] file tree not received after join — requesting stored tree');
+			this.socket.emit('room:request-tree', { roomId: this._roomId }, (ack: { ok: boolean; tree?: any[]; roomName?: string }) => {
+				// Re-check: the broadcast may have arrived while this request
+				// was in flight. Never populate twice.
+				if (this._fileTreeReceived) { return; }
+				if (!ack?.ok || !Array.isArray(ack.tree)) {
+					console.log('[LiveCollab] room:request-tree returned no tree');
+					return;
+				}
+				const resolvedName = ack.roomName || this._roomName || 'Shared Room';
+				console.log('[LiveCollab] stored tree received via fallback:', ack.tree.length, 'items, roomName:', resolvedName);
+				this._fileTreeReceived = true;
+				if (ack.roomName) { this._roomName = ack.roomName; }
+				this._onFileTree.fire({ tree: ack.tree, roomName: resolvedName });
+			});
+		}, 1500);
+	}
 
 	// ===== LiveCollab Dashboard verbs (Phase D week 1) =====
 	async listMyRooms(): Promise<any[]> {
@@ -565,6 +616,10 @@ export class LiveCollabService extends Disposable {
 		this._roomId = undefined;
 		this._roomName = undefined;
 		this._lastMembers = [];
+		// Disarm the room:request-tree fallback so it never fires into a
+		// room we've already left.
+		if (this._treeFallbackTimer) { clearTimeout(this._treeFallbackTimer); this._treeFallbackTimer = undefined; }
+		this._fileTreeReceived = false;
 		// Real, serious bug found via live testing (2026-08-20): Yjs docs
 		// were keyed ONLY by bare filename, never room-scoped, and never
 		// cleared here - meaning a file reused across a DIFFERENT room
@@ -634,7 +689,7 @@ export class LiveCollabService extends Disposable {
 		});
 	}
 
-	
+
 
 	// Real fix (PHASE3_YJS_DESIGN.md section 30, Option A): now returns
 	// the id-assigned tree from the server's own ack, so the host - who
@@ -698,7 +753,7 @@ export class LiveCollabService extends Disposable {
 	}
 
 	setRequestService(_requestService: IRequestService): void { }
-	
+
 }
 
 export const livecollabService = new LiveCollabService();
