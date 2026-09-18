@@ -1229,21 +1229,34 @@
 		let lcSocket = null;
 		let lcConnecting = false;
 		let lcTokenRefreshTimer = null;
+		let lcMintLastAttempt = 0;
+		let lcMintConsecutiveFails = 0;
+		const LC_MINT_COOLDOWN_MS = 30000; // 30s between mint attempts
 
 		async function lcMintToken() {
 			try {
+				// Cooldown: don't spam the server if mint keeps failing.
+				// Socket.io reconnection calls auth on every retry, which
+				// without this guard fires mint dozens of times per minute.
+				const now = Date.now();
+				if (now - lcMintLastAttempt < LC_MINT_COOLDOWN_MS) { return null; }
+				lcMintLastAttempt = now;
+
 				let tok = '';
 				try { tok = localStorage.getItem('__clerk_db_jwt') || ''; } catch(e) {}
 				if (!tok || !window.vscode || !window.vscode.ipcRenderer) return null;
-				// Real fix (2026-09-02): vscode:livecollab-mint-token now returns
-				// { jwt, error, serverResponse } instead of a raw string, changed
-				// earlier this session to make mint failures visible. This caller
-				// was missed at the time and was still treating the whole object
-				// as the token itself, sending [object Object] to the server and
-				// causing every dashboard socket connection to fail as
-				// unauthorized. Extract the real jwt field.
 				const result = await window.vscode.ipcRenderer.invoke('vscode:livecollab-mint-token', tok);
-				if (!result || !result.jwt) { console.log('[LiveCollab] dashboard mint failed:', result); return null; }
+				if (!result || !result.jwt) {
+					lcMintConsecutiveFails++;
+					const reason = (result && result.serverResponse && result.serverResponse.reason) || (result && result.error) || 'unknown';
+					console.log('[LiveCollab] dashboard mint failed (' + lcMintConsecutiveFails + '):', reason, result);
+					if (lcMintConsecutiveFails >= 5) {
+						console.warn('[LiveCollab] mint failed 5+ times — stopping refresh timer. Log out and back in to reset.');
+						if (lcTokenRefreshTimer) { clearInterval(lcTokenRefreshTimer); lcTokenRefreshTimer = null; }
+					}
+					return null;
+				}
+				lcMintConsecutiveFails = 0; // reset on success
 				return result.jwt;
 			} catch(e) { return null; }
 		}
