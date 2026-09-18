@@ -166,8 +166,8 @@ export class LiveCollabService extends Disposable {
 	readonly onYjsUpdate: Event<{ fileId: string; update: Uint8Array }> = this._onYjsUpdate.event;
 	readonly onMemberJoined: Event<void> = this._onMemberJoined.event;
 
-	private readonly _onFileTree = this._register(new Emitter<{ tree: any[], roomName: string }>());
-	readonly onFileTree: Event<{ tree: any[], roomName: string }> = this._onFileTree.event;
+	private readonly _onFileTree = this._register(new Emitter<{ tree: any[], roomName: string, folderName?: string }>());
+	readonly onFileTree: Event<{ tree: any[], roomName: string, folderName?: string }> = this._onFileTree.event;
 
 	private readonly _onFileContent = this._register(new Emitter<{ path: string; content: string }>());
 	readonly onFileContent: Event<{ path: string; content: string }> = this._onFileContent.event;
@@ -295,13 +295,13 @@ export class LiveCollabService extends Disposable {
 		this.socket.on('room:member:joined', ({ roomName }: { roomName?: string }) => {
 			this._onMemberJoined.fire();
 		});
-		this.socket.on('room:file:tree', ({ tree, roomName }: { tree: any[], roomName?: string }) => {
+		this.socket.on('room:file:tree', ({ tree, roomName, folderName }: { tree: any[], roomName?: string, folderName?: string }) => {
 			const resolvedName = roomName || this._roomName || 'Shared Room';
-			console.log('[LiveCollab] file tree received:', tree.length, 'items, roomName:', resolvedName);
+			console.log('[LiveCollab] file tree received:', tree.length, 'items, roomName:', resolvedName, 'folderName:', folderName);
 			// Broadcast landed - disarm the room:request-tree fallback.
 			this._fileTreeReceived = true;
 			if (roomName) { this._roomName = roomName; }
-			this._onFileTree.fire({ tree, roomName: resolvedName });
+			this._onFileTree.fire({ tree, roomName: resolvedName, folderName });
 		});
 		this.socket.on('room:file:content', ({ path, content }: { path: string; content: string }) => {
 			console.log('[LiveCollab] file content received:', path);
@@ -371,7 +371,7 @@ export class LiveCollabService extends Disposable {
 			if (this._fileTreeReceived) { return; }
 			if (!this.socket?.connected || !this._roomId) { return; }
 			console.log('[LiveCollab] file tree not received after join — requesting stored tree');
-			this.socket.emit('room:request-tree', { roomId: this._roomId }, (ack: { ok: boolean; tree?: any[]; roomName?: string }) => {
+			this.socket.emit('room:request-tree', { roomId: this._roomId }, (ack: { ok: boolean; tree?: any[]; roomName?: string; folderName?: string }) => {
 				// Re-check: the broadcast may have arrived while this request
 				// was in flight. Never populate twice.
 				if (this._fileTreeReceived) { return; }
@@ -380,10 +380,10 @@ export class LiveCollabService extends Disposable {
 					return;
 				}
 				const resolvedName = ack.roomName || this._roomName || 'Shared Room';
-				console.log('[LiveCollab] stored tree received via fallback:', ack.tree.length, 'items, roomName:', resolvedName);
+				console.log('[LiveCollab] stored tree received via fallback:', ack.tree.length, 'items, roomName:', resolvedName, 'folderName:', ack.folderName);
 				this._fileTreeReceived = true;
 				if (ack.roomName) { this._roomName = ack.roomName; }
-				this._onFileTree.fire({ tree: ack.tree, roomName: resolvedName });
+				this._onFileTree.fire({ tree: ack.tree, roomName: resolvedName, folderName: ack.folderName });
 			});
 		}, 1500);
 	}
@@ -696,11 +696,11 @@ export class LiveCollabService extends Disposable {
 	// never receives its own broadcast back via the normal room-wide
 	// emit - can still learn the exact same server-assigned file ids
 	// that every guest receives, instead of only guests ever having them.
-	async broadcastFileTree(tree: any[]): Promise<any[] | undefined> {
+	async broadcastFileTree(tree: any[], folderName?: string): Promise<any[] | undefined> {
 		if (!this.socket?.connected || !this._roomId) { return undefined; }
-		console.log('[LiveCollab] broadcasting file tree with roomName:', this._roomName);
+		console.log('[LiveCollab] broadcasting file tree with roomName:', this._roomName, 'folderName:', folderName);
 		return new Promise((resolve) => {
-			this.socket!.emit('room:file:tree', { roomId: this._roomId, tree, roomName: this._roomName || 'Shared Room' }, (ack: { ok: boolean; tree?: any[] }) => {
+			this.socket!.emit('room:file:tree', { roomId: this._roomId, tree, roomName: this._roomName || 'Shared Room', folderName }, (ack: { ok: boolean; tree?: any[] }) => {
 				resolve(ack?.tree);
 			});
 		});

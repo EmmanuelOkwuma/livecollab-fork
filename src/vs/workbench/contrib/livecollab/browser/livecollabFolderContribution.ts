@@ -167,51 +167,27 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 		let _virtualFolderAdded = false;
 
 		// When file tree arrives — populate virtual file system and open workspace
-		this._register(livecollabService.onFileTree(async ({ tree, roomName }) => {
+		this._register(livecollabService.onFileTree(async ({ tree, roomName, folderName }) => {
 			const roomId = livecollabService.roomId;
 			if (!roomId) { return; }
-			console.log('[#DOOR2-DIAG] onFileTree FIRED at', Date.now(), 'tree items:', tree.length, 'roomName:', roomName);
-			console.trace('[#DOOR2-DIAG] onFileTree call stack');
-			console.log('[LiveCollab] populating virtual file system with tree:', tree.length, 'items, roomName:', roomName);
+			console.log('[LiveCollab] populating virtual file system with tree:', tree.length, 'items, roomName:', roomName, 'folderName:', folderName);
 			livecollabFileSystemProvider.setRoomId(roomId);
 			await livecollabFileSystemProvider.populateFromTree(tree);
-			// Real fix (PHASE3_YJS_DESIGN.md section 30 follow-up, real,
-			// confirmed blocker): the previous code added ONE workspace
-			// folder at the virtual root, named after the room - wrapping
-			// the guest's entire tree inside a "Shared Room" folder that
-			// doesn't exist on the host's own side at all. This didn't just
-			// look wrong - it was a real, confirmed blocker: the guest's
-			// file ended up at a genuinely different identity path than the
-			// host's same file, so the server-assigned Yjs file id could
-			// never match between them, confirmed live via
-			// "_setupYjsBinding: no server-assigned id yet" on the guest's
-			// side despite the id genuinely existing on the host's side.
-			// Now each real, top-level item from the host's own tree gets
-			// added as its own separate workspace folder, exactly matching
-			// the host's real structure - no extra wrapper layer at all.
+			// Add ONE workspace folder at the virtual root, named after the
+			// host's real folder. VS Code resolves the children from the
+			// virtual filesystem automatically, giving the guest the exact
+			// same Explorer view as the host: folderName > {all files and
+			// subdirectories}. Previous approaches either (a) wrapped
+			// everything in a "Shared Room" folder that didn't match the
+			// host's path structure, breaking Yjs file-id matching, or
+			// (b) added each top-level directory as its own workspace folder
+			// while losing root-level files entirely.
 			if (!_virtualFolderAdded) {
 				_virtualFolderAdded = true;
-				// Real fix (PHASE3_YJS_DESIGN.md section 32 follow-up, real bug
-				// caught with direct evidence): the previous version mapped
-				// every single tree item, including individual root-level
-				// files (.env.local, package.json, etc.), into its own,
-				// separate workspace folder - a file can't be a valid
-				// workspace root at all in VS Code's own model. Confirmed via
-				// the marker log showing 19 real items processed, matching
-				// exactly 5 real folders plus 14 real root-level files after
-				// the skip list - all 19 were being passed to updateFolders,
-				// not just the 5 real directories, very likely the real cause
-				// of the observed "Shared Room" grouping behavior. Only real
-				// directories should become their own workspace folder; root-
-				// level files already exist correctly in the virtual
-				// filesystem via populateFromTree above and don't need this.
-				const realDirectories = tree.filter((item) => item.type === 'directory');
-				console.log('[LiveCollab] BUILD-VERIFY-2026-09-10 wrapper-fix-active, real top-level items:', tree.length, 'real directories:', realDirectories.length);
-				const topLevelFolders = realDirectories.map((item) => ({
-					uri: URI.file('/').with({ scheme: LIVECOLLAB_SCHEME, authority: roomId, path: `/${item.name}` }),
-					name: item.name,
-				}));
-				await this.workspaceEditingService.updateFolders(0, 0, topLevelFolders);
+				const displayName = folderName || roomName || 'Shared Workspace';
+				console.log('[LiveCollab] adding virtual workspace folder:', displayName);
+				const rootUri = URI.file('/').with({ scheme: LIVECOLLAB_SCHEME, authority: roomId, path: '/' });
+				await this.workspaceEditingService.updateFolders(0, 0, [{ uri: rootUri, name: displayName }]);
 			}
 		}));
 
@@ -219,8 +195,11 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 		this._register(livecollabService.onMemberJoined(async () => {
 			const folders = this.workspaceContextService.getWorkspace().folders;
 			if (!folders || folders.length === 0) { return; }
-			console.log('[LiveCollab] new member joined — re-broadcasting file tree');
-			await this._broadcastFileTree(folders[0].uri);
+			// Use the first real (non-virtual) folder for the name
+			const realFolder = folders.find(f => f.uri.scheme !== LIVECOLLAB_SCHEME);
+			const nameToSend = realFolder?.name || folders[0].name;
+			console.log('[LiveCollab] new member joined — re-broadcasting file tree, folderName:', nameToSend);
+			await this._broadcastFileTree(realFolder?.uri || folders[0].uri, nameToSend);
 		}));
 
 		// Handle file content requests from guests
@@ -289,11 +268,11 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 		}
 
 		const folder = folders[0];
-		console.log('[LiveCollab] attaching folder content to room:', roomId);
-		await this._broadcastFileTree(folder.uri);
+		console.log('[LiveCollab] attaching folder content to room:', roomId, 'folderName:', folder.name);
+		await this._broadcastFileTree(folder.uri, folder.name);
 	}
 
-	private async _broadcastFileTree(folderUri: URI): Promise<void> {
+	private async _broadcastFileTree(folderUri: URI, folderName?: string): Promise<void> {
 		try {
 			const tree = await this._readFileTree(folderUri, 0);
 			// Real fix (real root cause, found with direct evidence): a guest
@@ -315,9 +294,9 @@ export class LiveCollabFolderContribution extends Disposable implements IWorkben
 			// assigned id on every entry. socket.to() excludes the sender,
 			// so this is the host's only way to learn its own files' ids -
 			// guests learn theirs from the normal room-wide broadcast.
-			const treeWithIds = await livecollabService.broadcastFileTree(tree);
+			const treeWithIds = await livecollabService.broadcastFileTree(tree, folderName);
 			if (treeWithIds) { livecollabFileSystemProvider.storeServerFileIds(treeWithIds); }
-			console.log('[LiveCollab] file tree broadcast:', tree.length, 'items');
+			console.log('[LiveCollab] file tree broadcast:', tree.length, 'items, folderName:', folderName);
 		} catch (e) {
 			console.error('[LiveCollab] failed to read file tree:', e);
 		}
